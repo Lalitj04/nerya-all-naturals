@@ -27,6 +27,7 @@ repositories {
 ext {
     springdocVersion = '2.6.0'
     testcontainersVersion = '1.20.2'
+    jjwtVersion = '0.12.6'
 }
 
 dependencies {
@@ -40,6 +41,11 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
     
     implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+    
+    // JWT dependencies
+    implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
     
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'org.flywaydb:flyway-core'
