@@ -1,9 +1,7 @@
-# Gradle
+# Gradle build cache (keep gradle wrapper)
 .gradle/
 build/
-gradle/
-gradlew
-gradlew.bat
+!gradle/wrapper/
 
 # IDE
 .idea/
@@ -20,8 +18,7 @@ Thumbs.db
 .git/
 .gitignore
 
-# Docker
-Dockerfile*
+# Docker (keep Dockerfiles)
 docker-compose*
 .dockerignore
 

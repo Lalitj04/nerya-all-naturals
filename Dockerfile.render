@@ -1,10 +1,10 @@
-# Multi-stage build for Spring Boot application
+# Render.com optimized Dockerfile
 FROM gradle:8.5-jdk21-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Copy gradle wrapper and build files first
+# Copy gradle wrapper files
 COPY gradle/ gradle/
 COPY gradlew* ./
 COPY build.gradle settings.gradle gradle.properties ./
@@ -15,17 +15,17 @@ RUN chmod +x ./gradlew
 # Copy source code
 COPY src/ src/
 
-# Build the application
-RUN ./gradlew bootJar --no-daemon
+# Build the application with optimizations for cloud deployment
+RUN ./gradlew bootJar --no-daemon --parallel
 
-# Runtime stage
-FROM openjdk:11-ea-21-jre-slim
+# Runtime stage - using Amazon Corretto for better cloud compatibility
+FROM amazoncorretto:21-alpine
 
 # Install curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache curl
 
 # Create app user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
 
 # Set working directory
 WORKDIR /app
@@ -46,8 +46,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-# Set JVM options for containerized environment
-ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+# Set JVM options optimized for Render.com
+ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
