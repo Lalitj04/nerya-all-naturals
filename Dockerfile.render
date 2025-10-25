@@ -1,5 +1,5 @@
 # Render.com optimized Dockerfile
-FROM gradle:8.5-jdk21-alpine AS builder
+FROM gradle:8.5-jdk21 AS builder
 
 # Set working directory
 WORKDIR /app

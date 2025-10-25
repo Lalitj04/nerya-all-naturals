@@ -1,5 +1,5 @@
 # Multi-stage build for Spring Boot application
-FROM gradle:8.5-jdk21-alpine AS builder
+FROM gradle:8.5-jdk21 AS builder
 
 # Set working directory
 WORKDIR /app
@@ -19,13 +19,13 @@ COPY src/ src/
 RUN ./gradlew bootJar --no-daemon
 
 # Runtime stage
-FROM openjdk:11-ea-21-jre-slim
+FROM eclipse-temurin:21-jre-alpine
 
 # Install curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache curl
 
 # Create app user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
 
 # Set working directory
 WORKDIR /app
