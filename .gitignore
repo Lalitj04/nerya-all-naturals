@@ -69,3 +69,5 @@ target/
 application-local.yml
 application-dev.yml
 application-prod.yml
+.env
+.env.template

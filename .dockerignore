@@ -3,14 +3,14 @@
 build/
 !gradle/wrapper/
 
-# IDE
+# IDE files
 .idea/
 .vscode/
 *.iml
 *.ipr
 *.iws
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
@@ -18,7 +18,7 @@ Thumbs.db
 .git/
 .gitignore
 
-# Docker (keep Dockerfiles)
+# Docker files (keep Dockerfile)
 docker-compose*
 .dockerignore
 
@@ -30,12 +30,6 @@ logs/
 tmp/
 temp/
 
-# Node modules (if any)
-node_modules/
-
-# Maven (if any)
-target/
-
 # Documentation
 README.md
 *.md
@@ -44,3 +38,7 @@ docs/
 # Test reports
 build/reports/
 build/test-results/
+
+# Environment files
+.env
+.env.local

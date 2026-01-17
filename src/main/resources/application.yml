@@ -2,13 +2,13 @@ spring:
   application:
     name: nerya-all-naturals
   datasource:
-    url: jdbc:mysql://localhost:3306/nerya?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
-    username: nerya
-    password: change-me
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:nerya}?createDatabaseIfNotExist=true&useSSL=${DB_USE_SSL:false}&requireSSL=${DB_REQUIRE_SSL:false}&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:nerya}
+    password: ${DB_PASSWORD:change-me}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
