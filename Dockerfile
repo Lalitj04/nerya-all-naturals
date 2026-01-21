@@ -4,11 +4,13 @@ FROM gradle:8.5-jdk21 AS builder
 
 WORKDIR /app
 
-# Copy Gradle wrapper and configuration files
-COPY gradle/ gradle/
-COPY gradlew* ./
-COPY build.gradle settings.gradle gradle.properties ./
+# Copy Gradle wrapper and scripts first (critical for build)
+COPY gradlew gradlew.bat ./
+COPY gradle gradle
 RUN chmod +x ./gradlew
+
+# Copy Gradle configuration files
+COPY build.gradle settings.gradle gradle.properties ./
 
 # Copy source code
 COPY src/ src/
