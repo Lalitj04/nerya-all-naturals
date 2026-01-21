@@ -4,9 +4,13 @@ FROM gradle:8.5-jdk21 AS builder
 
 WORKDIR /app
 
-# Copy Gradle wrapper and scripts first (critical for build)
-COPY gradlew gradlew.bat ./
-COPY gradle gradle
+# Copy Gradle wrapper files first (must be before other files)
+# Create directory structure for wrapper
+RUN mkdir -p gradle/wrapper
+COPY gradlew ./
+COPY gradlew.bat ./
+COPY gradle/wrapper/gradle-wrapper.jar gradle/wrapper/
+COPY gradle/wrapper/gradle-wrapper.properties gradle/wrapper/
 RUN chmod +x ./gradlew
 
 # Copy Gradle configuration files
@@ -15,7 +19,7 @@ COPY build.gradle settings.gradle gradle.properties ./
 # Copy source code
 COPY src/ src/
 
-# Build the application (skip tests for faster builds, remove --no-daemon if you want to run tests)
+# Build using Gradle wrapper (works even if system Gradle version differs)
 RUN ./gradlew bootJar --no-daemon
 
 # Stage 2: Runtime image
