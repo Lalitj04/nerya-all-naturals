@@ -4,6 +4,7 @@ import com.nerya.neryaallnaturals.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -20,11 +21,30 @@ import java.util.stream.Collectors;
 @Slf4j
 public class JwtUtil {
 
-    @Value("${jwt.secret:mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLongForHS256Algorithm}")
+    /** HS256 requires a key of at least 256 bits (32 bytes). */
+    private static final int MIN_SECRET_BYTES = 32;
+
+    @Value("${jwt.secret}")
     private String secret;
 
     @Value("${jwt.expiration:86400000}") // Default: 24 hours in milliseconds
     private Long expiration;
+
+    /**
+     * Fail fast at startup if the JWT secret is missing or too weak, rather than
+     * silently signing tokens with an insecure key.
+     */
+    @PostConstruct
+    void validateSecret() {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "jwt.secret is not configured. Set the JWT_SECRET environment variable.");
+        }
+        if (secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "jwt.secret is too short; provide at least " + MIN_SECRET_BYTES + " bytes for HS256.");
+        }
+    }
 
     /**
      * Generate JWT token for authenticated user

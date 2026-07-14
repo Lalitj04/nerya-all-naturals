@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -120,7 +121,8 @@ public class UserController {
     @PutMapping("/{id}")
     @AdminOrUser
     public ResponseEntity<?> updateUser(@PathVariable Long id,
-                                        @Valid @RequestBody UserRequest userRequest) {
+                                        @Valid @RequestBody UserRequest userRequest,
+                                        Authentication authentication) {
         log.info("Updating user with ID: {}", id);
         Optional<User> userOptional = userRepository.findById(id);
 
@@ -159,9 +161,17 @@ public class UserController {
             user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
         }
 
-        // Update roles if provided
+        // Only an ADMIN may change roles. A non-admin (self-service) update must never
+        // be able to escalate privileges, so the roles field is ignored for them.
         if (userRequest.getRoles() != null) {
-            user.setRoles(userRequest.getRoles());
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            if (isAdmin) {
+                user.setRoles(userRequest.getRoles());
+            } else {
+                log.warn("Non-admin caller '{}' attempted to change roles on user ID {}; ignoring roles field",
+                        authentication.getName(), id);
+            }
         }
 
         User updatedUser = userRepository.save(user);
