@@ -66,18 +66,39 @@ public class AuthController {
     }
 
     /**
-     * Validate token endpoint
+     * Validate token endpoint. The token is read from the {@code Authorization: Bearer}
+     * header rather than a query parameter, so it is not exposed in access logs, proxies,
+     * or browser history.
      *
-     * @param token JWT token to validate
+     * @param authorizationHeader the {@code Authorization} request header
      * @return validation result
      */
     @GetMapping("/validate")
-    public ResponseEntity<?> validateToken(@RequestParam String token) {
-        boolean isValid = authService.validateToken(token);
-        if (isValid) {
+    public ResponseEntity<?> validateToken(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+        String token = extractBearerToken(authorizationHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Missing or malformed Authorization header");
+        }
+
+        if (authService.validateToken(token)) {
             String username = authService.getUsernameFromToken(token);
             return ResponseEntity.ok("Token is valid for user: " + username);
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+    }
+
+    /**
+     * Extract the bearer token from an {@code Authorization} header value.
+     *
+     * @param authorizationHeader the raw header value (may be null)
+     * @return the token, or null if the header is missing or not a Bearer token
+     */
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            return authorizationHeader.substring(7);
+        }
+        return null;
     }
 }

@@ -4,6 +4,7 @@ import com.nerya.neryaallnaturals.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -30,7 +31,11 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
+                // Explicit auth endpoints only — avoid a blanket /api/auth/** that would
+                // silently expose any future endpoint added under that prefix.
+                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/auth/validate").permitAll()
                 .requestMatchers("/api/health", "/api/ping").permitAll() // Deployment check endpoints
                 
                 // All other requests require authentication

@@ -5,17 +5,15 @@ import com.nerya.neryaallnaturals.annotation.AdminOrUser;
 import com.nerya.neryaallnaturals.dto.UserRequest;
 import com.nerya.neryaallnaturals.dto.UserResponse;
 import com.nerya.neryaallnaturals.entity.User;
-import com.nerya.neryaallnaturals.repository.UserRepository;
+import com.nerya.neryaallnaturals.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -26,8 +24,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserController {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserService userService;
 
     /**
      * Create a new user
@@ -41,36 +38,16 @@ public class UserController {
     public ResponseEntity<?> createUser(@Valid @RequestBody UserRequest userRequest) {
         log.info("Creating new user: {}", userRequest.getUsername());
 
-        // Check if username already exists
-        if (userRepository.findByUsername(userRequest.getUsername()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Username already exists");
+        if (userService.usernameExists(userRequest.getUsername())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
         }
 
-        // Check if email already exists
-        if (userRepository.findByEmail(userRequest.getEmail()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Email already exists");
+        if (userService.emailExists(userRequest.getEmail())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already exists");
         }
 
-        // Create new user
-        User user = User.builder()
-                .username(userRequest.getUsername())
-                .email(userRequest.getEmail())
-                .password(passwordEncoder.encode(userRequest.getPassword()))
-                .firstName(userRequest.getFirstName())
-                .lastName(userRequest.getLastName())
-                .phoneNumber(userRequest.getPhoneNumber())
-                .isActive(true)
-                .isEmailVerified(false)
-                .roles(userRequest.getRoles() != null ? userRequest.getRoles() : new HashSet<>())
-                .build();
-
-        User savedUser = userRepository.save(user);
-        log.info("User created successfully: {}", savedUser.getUsername());
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(UserResponse.fromEntity(savedUser));
+        User savedUser = userService.createUser(userRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.fromEntity(savedUser));
     }
 
     /**
@@ -83,7 +60,7 @@ public class UserController {
     @AdminOnly
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         log.info("Fetching all users");
-        List<UserResponse> users = userRepository.findAll().stream()
+        List<UserResponse> users = userService.getAllUsers().stream()
                 .map(UserResponse::fromEntity)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(users);
@@ -98,16 +75,23 @@ public class UserController {
      */
     @GetMapping("/{id}")
     @AdminOrUser
-    public ResponseEntity<?> getUserById(@PathVariable Long id) {
+    public ResponseEntity<?> getUserById(@PathVariable Long id,
+                                         Authentication authentication) {
         log.info("Fetching user with ID: {}", id);
-        Optional<User> userOptional = userRepository.findById(id);
+        Optional<User> userOptional = userService.findById(id);
 
         if (userOptional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("User not found with ID: " + id);
         }
 
-        return ResponseEntity.ok(UserResponse.fromEntity(userOptional.get()));
+        User user = userOptional.get();
+        if (!isAdmin(authentication) && !isOwner(authentication, user)) {
+            log.warn("Non-admin caller '{}' attempted to access user ID {}", authentication.getName(), id);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+        }
+
+        return ResponseEntity.ok(UserResponse.fromEntity(user));
     }
 
     /**
@@ -124,7 +108,7 @@ public class UserController {
                                         @Valid @RequestBody UserRequest userRequest,
                                         Authentication authentication) {
         log.info("Updating user with ID: {}", id);
-        Optional<User> userOptional = userRepository.findById(id);
+        Optional<User> userOptional = userService.findById(id);
 
         if (userOptional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -133,50 +117,22 @@ public class UserController {
 
         User user = userOptional.get();
 
-        // Check if username is being changed and if it already exists
-        if (!user.getUsername().equals(userRequest.getUsername())) {
-            if (userRepository.findByUsername(userRequest.getUsername()).isPresent()) {
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body("Username already exists");
-            }
-            user.setUsername(userRequest.getUsername());
+        if (!isAdmin(authentication) && !isOwner(authentication, user)) {
+            log.warn("Non-admin caller '{}' attempted to update user ID {}", authentication.getName(), id);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
         }
 
-        // Check if email is being changed and if it already exists
-        if (!user.getEmail().equals(userRequest.getEmail())) {
-            if (userRepository.findByEmail(userRequest.getEmail()).isPresent()) {
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                        .body("Email already exists");
-            }
-            user.setEmail(userRequest.getEmail());
+        // Reject username/email changes that collide with another account
+        if (!user.getUsername().equals(userRequest.getUsername())
+                && userService.usernameExists(userRequest.getUsername())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
+        }
+        if (!user.getEmail().equals(userRequest.getEmail())
+                && userService.emailExists(userRequest.getEmail())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already exists");
         }
 
-        // Update fields
-        user.setFirstName(userRequest.getFirstName());
-        user.setLastName(userRequest.getLastName());
-        user.setPhoneNumber(userRequest.getPhoneNumber());
-
-        // Update password if provided
-        if (userRequest.getPassword() != null && !userRequest.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
-        }
-
-        // Only an ADMIN may change roles. A non-admin (self-service) update must never
-        // be able to escalate privileges, so the roles field is ignored for them.
-        if (userRequest.getRoles() != null) {
-            boolean isAdmin = authentication.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-            if (isAdmin) {
-                user.setRoles(userRequest.getRoles());
-            } else {
-                log.warn("Non-admin caller '{}' attempted to change roles on user ID {}; ignoring roles field",
-                        authentication.getName(), id);
-            }
-        }
-
-        User updatedUser = userRepository.save(user);
-        log.info("User updated successfully: {}", updatedUser.getUsername());
-
+        User updatedUser = userService.updateUser(user, userRequest, isAdmin(authentication));
         return ResponseEntity.ok(UserResponse.fromEntity(updatedUser));
     }
 
@@ -191,16 +147,14 @@ public class UserController {
     @AdminOnly
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         log.info("Deleting user with ID: {}", id);
-        Optional<User> userOptional = userRepository.findById(id);
+        Optional<User> userOptional = userService.findById(id);
 
         if (userOptional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("User not found with ID: " + id);
         }
 
-        userRepository.deleteById(id);
-        log.info("User deleted successfully with ID: {}", id);
-
+        userService.deleteUser(userOptional.get());
         return ResponseEntity.ok("User deleted successfully");
     }
 
@@ -213,10 +167,16 @@ public class UserController {
      */
     @GetMapping("/username/{username}")
     @AdminOrUser
-    public ResponseEntity<?> getUserByUsername(@PathVariable String username) {
+    public ResponseEntity<?> getUserByUsername(@PathVariable String username,
+                                               Authentication authentication) {
         log.info("Fetching user with username: {}", username);
-        Optional<User> userOptional = userRepository.findByUsername(username);
 
+        if (!isAdmin(authentication) && !username.equals(authentication.getName())) {
+            log.warn("Non-admin caller '{}' attempted to access username {}", authentication.getName(), username);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+        }
+
+        Optional<User> userOptional = userService.getUserByUsername(username);
         if (userOptional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("User not found with username: " + username);
@@ -234,15 +194,38 @@ public class UserController {
      */
     @GetMapping("/email/{email}")
     @AdminOrUser
-    public ResponseEntity<?> getUserByEmail(@PathVariable String email) {
+    public ResponseEntity<?> getUserByEmail(@PathVariable String email,
+                                            Authentication authentication) {
         log.info("Fetching user with email: {}", email);
-        Optional<User> userOptional = userRepository.findByEmail(email);
+        Optional<User> userOptional = userService.getUserByEmail(email);
 
         if (userOptional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("User not found with email: " + email);
         }
 
-        return ResponseEntity.ok(UserResponse.fromEntity(userOptional.get()));
+        User user = userOptional.get();
+        if (!isAdmin(authentication) && !isOwner(authentication, user)) {
+            log.warn("Non-admin caller '{}' attempted to access email {}", authentication.getName(), email);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+        }
+
+        return ResponseEntity.ok(UserResponse.fromEntity(user));
+    }
+
+    /**
+     * @return true if the authenticated caller holds ROLE_ADMIN
+     */
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    /**
+     * @return true if the target user is the authenticated caller (matched by username,
+     * which is the JWT subject / principal name)
+     */
+    private boolean isOwner(Authentication authentication, User user) {
+        return user.getUsername().equals(authentication.getName());
     }
 }
