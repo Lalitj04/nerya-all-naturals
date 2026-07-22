@@ -3,6 +3,7 @@ package com.nerya.neryaallnaturals.controller;
 import com.nerya.neryaallnaturals.annotation.AdminOnly;
 import com.nerya.neryaallnaturals.dto.InventoryRequest;
 import com.nerya.neryaallnaturals.dto.InventoryResponse;
+import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -45,16 +45,11 @@ public class InventoryController {
      */
     @GetMapping("/admin/{id}")
     @AdminOnly
-    public ResponseEntity<?> getInventoryById(@PathVariable Long id) {
+    public ResponseEntity<InventoryResponse> getInventoryById(@PathVariable Long id) {
         log.info("Admin: Fetching inventory with ID: {}", id);
-        Optional<InventoryResponse> inventory = inventoryService.getInventoryById(id);
-        
-        if (inventory.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Inventory not found with ID: " + id);
-        }
-        
-        return ResponseEntity.ok(inventory.get());
+        InventoryResponse inventory = inventoryService.getInventoryById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory not found with ID: " + id));
+        return ResponseEntity.ok(inventory);
     }
 
     /**
@@ -66,16 +61,11 @@ public class InventoryController {
      */
     @GetMapping("/admin/product/{productId}")
     @AdminOnly
-    public ResponseEntity<?> getInventoryByProductId(@PathVariable Long productId) {
+    public ResponseEntity<InventoryResponse> getInventoryByProductId(@PathVariable Long productId) {
         log.info("Admin: Fetching inventory for product ID: {}", productId);
-        Optional<InventoryResponse> inventory = inventoryService.getInventoryByProductId(productId);
-        
-        if (inventory.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Inventory not found for product ID: " + productId);
-        }
-        
-        return ResponseEntity.ok(inventory.get());
+        InventoryResponse inventory = inventoryService.getInventoryByProductId(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory not found for product ID: " + productId));
+        return ResponseEntity.ok(inventory);
     }
 
     /**
@@ -87,17 +77,10 @@ public class InventoryController {
      */
     @PostMapping("/admin")
     @AdminOnly
-    public ResponseEntity<?> createInventory(@Valid @RequestBody InventoryRequest inventoryRequest) {
+    public ResponseEntity<InventoryResponse> createInventory(@Valid @RequestBody InventoryRequest inventoryRequest) {
         log.info("Admin: Creating new inventory for product ID: {}", inventoryRequest.getProductId());
-        
-        try {
-            InventoryResponse createdInventory = inventoryService.createInventory(inventoryRequest);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdInventory);
-            
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(e.getMessage());
-        }
+        InventoryResponse createdInventory = inventoryService.createInventory(inventoryRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdInventory);
     }
 
     /**
@@ -110,25 +93,13 @@ public class InventoryController {
      */
     @PutMapping("/admin/{id}")
     @AdminOnly
-    public ResponseEntity<?> updateInventory(
+    public ResponseEntity<InventoryResponse> updateInventory(
             @PathVariable Long id,
             @Valid @RequestBody InventoryRequest inventoryRequest) {
         log.info("Admin: Updating inventory with ID: {}", id);
-        
-        try {
-            Optional<InventoryResponse> updatedInventory = inventoryService.updateInventory(id, inventoryRequest);
-            
-            if (updatedInventory.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body("Inventory not found with ID: " + id);
-            }
-            
-            return ResponseEntity.ok(updatedInventory.get());
-            
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(e.getMessage());
-        }
+        InventoryResponse updatedInventory = inventoryService.updateInventory(id, inventoryRequest)
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory not found with ID: " + id));
+        return ResponseEntity.ok(updatedInventory);
     }
 
     /**
@@ -140,16 +111,15 @@ public class InventoryController {
      */
     @DeleteMapping("/admin/{id}")
     @AdminOnly
-    public ResponseEntity<?> deleteInventory(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteInventory(@PathVariable Long id) {
         log.info("Admin: Deleting inventory with ID: {}", id);
-        
+
         boolean deleted = inventoryService.deleteInventory(id);
-        
+
         if (!deleted) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Inventory not found with ID: " + id);
+            throw new ResourceNotFoundException("Inventory not found with ID: " + id);
         }
-        
-        return ResponseEntity.ok("Inventory deleted successfully");
+
+        return ResponseEntity.noContent().build();
     }
 }

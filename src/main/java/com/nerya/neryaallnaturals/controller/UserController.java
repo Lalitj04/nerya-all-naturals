@@ -5,6 +5,9 @@ import com.nerya.neryaallnaturals.annotation.AdminOrUser;
 import com.nerya.neryaallnaturals.dto.UserRequest;
 import com.nerya.neryaallnaturals.dto.UserResponse;
 import com.nerya.neryaallnaturals.entity.User;
+import com.nerya.neryaallnaturals.exception.ConflictException;
+import com.nerya.neryaallnaturals.exception.ForbiddenException;
+import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +18,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -35,15 +37,15 @@ public class UserController {
      */
     @PostMapping
     @AdminOnly
-    public ResponseEntity<?> createUser(@Valid @RequestBody UserRequest userRequest) {
+    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest userRequest) {
         log.info("Creating new user: {}", userRequest.getUsername());
 
         if (userService.usernameExists(userRequest.getUsername())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
+            throw new ConflictException("Username already exists");
         }
 
         if (userService.emailExists(userRequest.getEmail())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already exists");
+            throw new ConflictException("Email already exists");
         }
 
         User savedUser = userService.createUser(userRequest);
@@ -75,20 +77,15 @@ public class UserController {
      */
     @GetMapping("/{id}")
     @AdminOrUser
-    public ResponseEntity<?> getUserById(@PathVariable Long id,
+    public ResponseEntity<UserResponse> getUserById(@PathVariable Long id,
                                          Authentication authentication) {
         log.info("Fetching user with ID: {}", id);
-        Optional<User> userOptional = userService.findById(id);
+        User user = userService.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("User not found with ID: " + id);
-        }
-
-        User user = userOptional.get();
         if (!isAdmin(authentication) && !isOwner(authentication, user)) {
             log.warn("Non-admin caller '{}' attempted to access user ID {}", authentication.getName(), id);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         return ResponseEntity.ok(UserResponse.fromEntity(user));
@@ -104,32 +101,26 @@ public class UserController {
      */
     @PutMapping("/{id}")
     @AdminOrUser
-    public ResponseEntity<?> updateUser(@PathVariable Long id,
+    public ResponseEntity<UserResponse> updateUser(@PathVariable Long id,
                                         @Valid @RequestBody UserRequest userRequest,
                                         Authentication authentication) {
         log.info("Updating user with ID: {}", id);
-        Optional<User> userOptional = userService.findById(id);
-
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("User not found with ID: " + id);
-        }
-
-        User user = userOptional.get();
+        User user = userService.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (!isAdmin(authentication) && !isOwner(authentication, user)) {
             log.warn("Non-admin caller '{}' attempted to update user ID {}", authentication.getName(), id);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         // Reject username/email changes that collide with another account
         if (!user.getUsername().equals(userRequest.getUsername())
                 && userService.usernameExists(userRequest.getUsername())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
+            throw new ConflictException("Username already exists");
         }
         if (!user.getEmail().equals(userRequest.getEmail())
                 && userService.emailExists(userRequest.getEmail())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already exists");
+            throw new ConflictException("Email already exists");
         }
 
         User updatedUser = userService.updateUser(user, userRequest, isAdmin(authentication));
@@ -145,17 +136,13 @@ public class UserController {
      */
     @DeleteMapping("/{id}")
     @AdminOnly
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         log.info("Deleting user with ID: {}", id);
-        Optional<User> userOptional = userService.findById(id);
+        User user = userService.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("User not found with ID: " + id);
-        }
-
-        userService.deleteUser(userOptional.get());
-        return ResponseEntity.ok("User deleted successfully");
+        userService.deleteUser(user);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -167,22 +154,19 @@ public class UserController {
      */
     @GetMapping("/username/{username}")
     @AdminOrUser
-    public ResponseEntity<?> getUserByUsername(@PathVariable String username,
+    public ResponseEntity<UserResponse> getUserByUsername(@PathVariable String username,
                                                Authentication authentication) {
         log.info("Fetching user with username: {}", username);
 
         if (!isAdmin(authentication) && !username.equals(authentication.getName())) {
             log.warn("Non-admin caller '{}' attempted to access username {}", authentication.getName(), username);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
-        Optional<User> userOptional = userService.getUserByUsername(username);
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("User not found with username: " + username);
-        }
+        User user = userService.getUserByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return ResponseEntity.ok(UserResponse.fromEntity(userOptional.get()));
+        return ResponseEntity.ok(UserResponse.fromEntity(user));
     }
 
     /**
@@ -194,20 +178,15 @@ public class UserController {
      */
     @GetMapping("/email/{email}")
     @AdminOrUser
-    public ResponseEntity<?> getUserByEmail(@PathVariable String email,
+    public ResponseEntity<UserResponse> getUserByEmail(@PathVariable String email,
                                             Authentication authentication) {
         log.info("Fetching user with email: {}", email);
-        Optional<User> userOptional = userService.getUserByEmail(email);
+        User user = userService.getUserByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("User not found with email: " + email);
-        }
-
-        User user = userOptional.get();
         if (!isAdmin(authentication) && !isOwner(authentication, user)) {
             log.warn("Non-admin caller '{}' attempted to access email {}", authentication.getName(), email);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         return ResponseEntity.ok(UserResponse.fromEntity(user));

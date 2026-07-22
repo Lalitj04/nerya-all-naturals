@@ -26,6 +26,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .cors(cors -> {})
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
@@ -37,7 +38,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/validate").permitAll()
                 .requestMatchers("/api/health", "/api/ping").permitAll() // Deployment check endpoints
-                
+                // Public catalog reads — /admin/** sub-paths on these controllers stay
+                // authenticated below since they're not matched by these single/segment
+                // patterns (checked against the controllers' actual admin routes).
+                .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/category/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}", "/api/categories/parents").permitAll()
+
                 // All other requests require authentication
                 // Authorization is handled by method-level annotations (@AdminOnly, @CustomerOnly, etc.)
                 .anyRequest().authenticated()

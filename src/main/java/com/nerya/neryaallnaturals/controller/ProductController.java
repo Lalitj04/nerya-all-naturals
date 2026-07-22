@@ -3,6 +3,7 @@ package com.nerya.neryaallnaturals.controller;
 import com.nerya.neryaallnaturals.annotation.AdminOnly;
 import com.nerya.neryaallnaturals.dto.ProductRequest;
 import com.nerya.neryaallnaturals.dto.ProductResponse;
+import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/products")
@@ -58,16 +58,11 @@ public class ProductController {
      * @return product details
      */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProductById(@PathVariable Long id) {
+    public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
         log.info("Fetching product with ID: {}", id);
-        Optional<ProductResponse> product = productService.getProductById(id);
-        
-        if (product.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Product not found with ID: " + id);
-        }
-        
-        return ResponseEntity.ok(product.get());
+        ProductResponse product = productService.getProductById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+        return ResponseEntity.ok(product);
     }
 
     /**
@@ -93,17 +88,10 @@ public class ProductController {
      */
     @PostMapping("/admin")
     @AdminOnly
-    public ResponseEntity<?> createProduct(@Valid @RequestBody ProductRequest productRequest) {
+    public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest productRequest) {
         log.info("Admin: Creating new product: {}", productRequest.getName());
-        
-        try {
-            ProductResponse createdProduct = productService.createProduct(productRequest);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
-            
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(e.getMessage());
-        }
+        ProductResponse createdProduct = productService.createProduct(productRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
     }
 
     /**
@@ -116,25 +104,13 @@ public class ProductController {
      */
     @PutMapping("/admin/{id}")
     @AdminOnly
-    public ResponseEntity<?> updateProduct(
+    public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody ProductRequest productRequest) {
         log.info("Admin: Updating product with ID: {}", id);
-        
-        try {
-            Optional<ProductResponse> updatedProduct = productService.updateProduct(id, productRequest);
-            
-            if (updatedProduct.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body("Product not found with ID: " + id);
-            }
-            
-            return ResponseEntity.ok(updatedProduct.get());
-            
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(e.getMessage());
-        }
+        ProductResponse updatedProduct = productService.updateProduct(id, productRequest)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+        return ResponseEntity.ok(updatedProduct);
     }
 
     /**
@@ -146,17 +122,16 @@ public class ProductController {
      */
     @DeleteMapping("/admin/{id}")
     @AdminOnly
-    public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         log.info("Admin: Deleting product with ID: {}", id);
-        
+
         boolean deleted = productService.deleteProduct(id);
-        
+
         if (!deleted) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Product not found with ID: " + id);
+            throw new ResourceNotFoundException("Product not found with ID: " + id);
         }
-        
-        return ResponseEntity.ok("Product deleted successfully");
+
+        return ResponseEntity.noContent().build();
     }
 }
 

@@ -3,6 +3,8 @@ package com.nerya.neryaallnaturals.service;
 import com.nerya.neryaallnaturals.dto.CategoryRequest;
 import com.nerya.neryaallnaturals.dto.CategoryResponse;
 import com.nerya.neryaallnaturals.entity.Category;
+import com.nerya.neryaallnaturals.exception.ConflictException;
+import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,7 +63,7 @@ public class CategoryService {
 
         // Check if category name already exists
         if (categoryRepository.findByName(categoryRequest.getName()).isPresent()) {
-            throw new RuntimeException("Category name already exists: " + categoryRequest.getName());
+            throw new ConflictException("Category name already exists: " + categoryRequest.getName());
         }
 
         Category category = Category.builder()
@@ -75,7 +77,7 @@ public class CategoryService {
         if (categoryRequest.getParentId() != null) {
             Optional<Category> parentCategory = categoryRepository.findById(categoryRequest.getParentId());
             if (parentCategory.isEmpty()) {
-                throw new RuntimeException("Parent category not found with ID: " + categoryRequest.getParentId());
+                throw new ResourceNotFoundException("Parent category not found with ID: " + categoryRequest.getParentId());
             }
             category.setParentCategory(parentCategory.get());
         }

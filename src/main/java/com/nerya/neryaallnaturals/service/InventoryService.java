@@ -4,6 +4,8 @@ import com.nerya.neryaallnaturals.dto.InventoryRequest;
 import com.nerya.neryaallnaturals.dto.InventoryResponse;
 import com.nerya.neryaallnaturals.entity.Inventory;
 import com.nerya.neryaallnaturals.entity.Product;
+import com.nerya.neryaallnaturals.exception.ConflictException;
+import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.repository.InventoryRepository;
 import com.nerya.neryaallnaturals.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -64,13 +66,13 @@ public class InventoryService {
         // Check if product exists
         Optional<Product> productOptional = productRepository.findById(inventoryRequest.getProductId());
         if (productOptional.isEmpty()) {
-            throw new RuntimeException("Product not found with ID: " + inventoryRequest.getProductId());
+            throw new ResourceNotFoundException("Product not found with ID: " + inventoryRequest.getProductId());
         }
 
         // Check if inventory already exists for this product
         Optional<Inventory> existingInventory = inventoryRepository.findByProductId(inventoryRequest.getProductId());
         if (existingInventory.isPresent()) {
-            throw new RuntimeException("Inventory already exists for product ID: " + inventoryRequest.getProductId());
+            throw new ConflictException("Inventory already exists for product ID: " + inventoryRequest.getProductId());
         }
 
         // Create inventory
@@ -110,13 +112,13 @@ public class InventoryService {
             // Check if new product exists
             Optional<Product> productOptional = productRepository.findById(inventoryRequest.getProductId());
             if (productOptional.isEmpty()) {
-                throw new RuntimeException("Product not found with ID: " + inventoryRequest.getProductId());
+                throw new ResourceNotFoundException("Product not found with ID: " + inventoryRequest.getProductId());
             }
 
             // Check if inventory already exists for the new product
             Optional<Inventory> existingInventory = inventoryRepository.findByProductId(inventoryRequest.getProductId());
             if (existingInventory.isPresent() && !existingInventory.get().getId().equals(id)) {
-                throw new RuntimeException("Inventory already exists for product ID: " + inventoryRequest.getProductId());
+                throw new ConflictException("Inventory already exists for product ID: " + inventoryRequest.getProductId());
             }
 
             inventory.setProduct(productOptional.get());

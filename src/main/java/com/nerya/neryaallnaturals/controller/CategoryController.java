@@ -3,6 +3,7 @@ package com.nerya.neryaallnaturals.controller;
 import com.nerya.neryaallnaturals.annotation.AdminOnly;
 import com.nerya.neryaallnaturals.dto.CategoryRequest;
 import com.nerya.neryaallnaturals.dto.CategoryResponse;
+import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/categories")
@@ -43,16 +43,11 @@ public class CategoryController {
      * @return category details
      */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getCategoryById(@PathVariable Long id) {
+    public ResponseEntity<CategoryResponse> getCategoryById(@PathVariable Long id) {
         log.info("Fetching category with ID: {}", id);
-        Optional<CategoryResponse> category = categoryService.getCategoryById(id);
-        
-        if (category.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Category not found with ID: " + id);
-        }
-        
-        return ResponseEntity.ok(category.get());
+        CategoryResponse category = categoryService.getCategoryById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + id));
+        return ResponseEntity.ok(category);
     }
 
     /**
@@ -77,17 +72,10 @@ public class CategoryController {
      */
     @PostMapping("/admin")
     @AdminOnly
-    public ResponseEntity<?> createCategory(@Valid @RequestBody CategoryRequest categoryRequest) {
+    public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest categoryRequest) {
         log.info("Admin: Creating new category: {}", categoryRequest.getName());
-        
-        try {
-            CategoryResponse createdCategory = categoryService.createCategory(categoryRequest);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory);
-            
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(e.getMessage());
-        }
+        CategoryResponse createdCategory = categoryService.createCategory(categoryRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory);
     }
 }
 

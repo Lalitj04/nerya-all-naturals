@@ -5,6 +5,8 @@ import com.nerya.neryaallnaturals.dto.ProductResponse;
 import com.nerya.neryaallnaturals.entity.Category;
 import com.nerya.neryaallnaturals.entity.Product;
 import com.nerya.neryaallnaturals.entity.ProductImage;
+import com.nerya.neryaallnaturals.exception.ConflictException;
+import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.repository.CategoryRepository;
 import com.nerya.neryaallnaturals.repository.InventoryRepository;
 import com.nerya.neryaallnaturals.repository.ProductImageRepository;
@@ -80,13 +82,13 @@ public class ProductService {
 
         // Check if SKU already exists
         if (productRepository.findBySku(productRequest.getSku()).isPresent()) {
-            throw new RuntimeException("SKU already exists: " + productRequest.getSku());
+            throw new ConflictException("SKU already exists: " + productRequest.getSku());
         }
 
         // Get category
         Optional<Category> categoryOptional = categoryRepository.findById(productRequest.getCategoryId());
         if (categoryOptional.isEmpty()) {
-            throw new RuntimeException("Category not found with ID: " + productRequest.getCategoryId());
+            throw new ResourceNotFoundException("Category not found with ID: " + productRequest.getCategoryId());
         }
 
         // Create product
@@ -148,14 +150,14 @@ public class ProductService {
         // Check if SKU is being changed and if it exists
         if (!product.getSku().equals(productRequest.getSku())) {
             if (productRepository.findBySku(productRequest.getSku()).isPresent()) {
-                throw new RuntimeException("SKU already exists: " + productRequest.getSku());
+                throw new ConflictException("SKU already exists: " + productRequest.getSku());
             }
         }
 
         // Get category
         Optional<Category> categoryOptional = categoryRepository.findById(productRequest.getCategoryId());
         if (categoryOptional.isEmpty()) {
-            throw new RuntimeException("Category not found with ID: " + productRequest.getCategoryId());
+            throw new ResourceNotFoundException("Category not found with ID: " + productRequest.getCategoryId());
         }
 
         // Update product fields
