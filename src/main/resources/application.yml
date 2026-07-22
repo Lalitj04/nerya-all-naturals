@@ -18,6 +18,10 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 jwt:
   secret: ${JWT_SECRET}
@@ -30,6 +34,16 @@ admin:
   username: ${ADMIN_USERNAME:}
   password: ${ADMIN_PASSWORD:}
   email: ${ADMIN_EMAIL:}
+
+media:
+  google:
+    credentials-path: ${GOOGLE_DRIVE_CREDENTIALS:}
+    folders:
+      HERO: ${DRIVE_FOLDER_HERO:}
+      BANNER: ${DRIVE_FOLDER_BANNER:}
+      PRODUCT: ${DRIVE_FOLDER_PRODUCT:}
+      CATEGORY: ${DRIVE_FOLDER_CATEGORY:}
+      GALLERY: ${DRIVE_FOLDER_GALLERY:}
 
 management:
   endpoints:

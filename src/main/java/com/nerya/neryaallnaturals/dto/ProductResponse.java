@@ -1,5 +1,6 @@
 package com.nerya.neryaallnaturals.dto;
 
+import com.nerya.neryaallnaturals.entity.MediaAsset;
 import com.nerya.neryaallnaturals.entity.Product;
 import com.nerya.neryaallnaturals.entity.ProductImage;
 import lombok.AllArgsConstructor;
@@ -9,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -41,16 +43,21 @@ public class ProductResponse {
     private String metaDescription;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    
+
     // Category info
     private Long categoryId;
     private String categoryName;
-    
-    // Images
-    private List<ProductImageResponse> images;
+
+    // Images — Drive-backed media_assets rows when present, otherwise the legacy
+    // ProductImage rows adapted into the same shape (see [[T25]] media migration).
+    private List<MediaAssetResponse> images;
     private String primaryImageUrl;
 
     public static ProductResponse fromEntity(Product product) {
+        return fromEntity(product, Collections.emptyList());
+    }
+
+    public static ProductResponse fromEntity(Product product, List<MediaAssetResponse> mediaAssets) {
         ProductResponse.ProductResponseBuilder builder = ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -81,23 +88,43 @@ public class ProductResponse {
                    .categoryName(product.getCategory().getName());
         }
 
-        // Set images
-        if (product.getImages() != null && !product.getImages().isEmpty()) {
-            List<ProductImageResponse> imageResponses = product.getImages().stream()
-                    .map(ProductImageResponse::fromEntity)
-                    .collect(Collectors.toList());
-            builder.images(imageResponses);
+        List<MediaAssetResponse> images = (mediaAssets != null && !mediaAssets.isEmpty())
+                ? mediaAssets
+                : legacyImagesAsMediaAssets(product);
 
-            // Find primary image
-            String primaryUrl = product.getImages().stream()
-                    .filter(ProductImage::getIsPrimary)
-                    .findFirst()
-                    .map(ProductImage::getImageUrl)
-                    .orElse(product.getImages().get(0).getImageUrl());
-            builder.primaryImageUrl(primaryUrl);
+        if (!images.isEmpty()) {
+            builder.images(images).primaryImageUrl(images.get(0).getPublicUrl());
         }
 
         return builder.build();
     }
-}
 
+    private static List<MediaAssetResponse> legacyImagesAsMediaAssets(Product product) {
+        if (product.getImages() == null || product.getImages().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<ProductImage> ordered = product.getImages().stream()
+                .sorted((a, b) -> {
+                    if (Boolean.TRUE.equals(a.getIsPrimary()) && !Boolean.TRUE.equals(b.getIsPrimary())) {
+                        return -1;
+                    }
+                    if (!Boolean.TRUE.equals(a.getIsPrimary()) && Boolean.TRUE.equals(b.getIsPrimary())) {
+                        return 1;
+                    }
+                    return a.getDisplayOrder().compareTo(b.getDisplayOrder());
+                })
+                .collect(Collectors.toList());
+
+        return ordered.stream()
+                .map(image -> MediaAssetResponse.builder()
+                        .id(image.getId())
+                        .category(MediaAsset.MediaCategory.PRODUCT)
+                        .publicUrl(image.getImageUrl())
+                        .altText(image.getAltText())
+                        .sortOrder(image.getDisplayOrder())
+                        .productId(product.getId())
+                        .build())
+                .collect(Collectors.toList());
+    }
+}

@@ -43,6 +43,7 @@ public class SecurityConfig {
                 // patterns (checked against the controllers' actual admin routes).
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/category/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}", "/api/categories/parents").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/media", "/api/media/{id}", "/api/media/category/**", "/api/media/product/**").permitAll()
 
                 // All other requests require authentication
                 // Authorization is handled by method-level annotations (@AdminOnly, @CustomerOnly, etc.)

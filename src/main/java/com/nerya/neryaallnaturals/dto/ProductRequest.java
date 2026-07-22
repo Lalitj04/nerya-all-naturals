@@ -68,5 +68,10 @@ public class ProductRequest {
     private List<String> imageUrls;
 
     private Boolean isPrimaryImage;
+
+    /**
+     * IDs of already-uploaded MediaAsset rows to attach to this product.
+     */
+    private List<Long> mediaAssetIds;
 }
 

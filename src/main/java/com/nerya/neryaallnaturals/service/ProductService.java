@@ -1,14 +1,17 @@
 package com.nerya.neryaallnaturals.service;
 
+import com.nerya.neryaallnaturals.dto.MediaAssetResponse;
 import com.nerya.neryaallnaturals.dto.ProductRequest;
 import com.nerya.neryaallnaturals.dto.ProductResponse;
 import com.nerya.neryaallnaturals.entity.Category;
+import com.nerya.neryaallnaturals.entity.MediaAsset;
 import com.nerya.neryaallnaturals.entity.Product;
 import com.nerya.neryaallnaturals.entity.ProductImage;
 import com.nerya.neryaallnaturals.exception.ConflictException;
 import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.repository.CategoryRepository;
 import com.nerya.neryaallnaturals.repository.InventoryRepository;
+import com.nerya.neryaallnaturals.repository.MediaAssetRepository;
 import com.nerya.neryaallnaturals.repository.ProductImageRepository;
 import com.nerya.neryaallnaturals.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +19,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -29,6 +34,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final ProductImageRepository productImageRepository;
     private final InventoryRepository inventoryRepository;
+    private final MediaAssetRepository mediaAssetRepository;
 
     /**
      * Get all active products
@@ -36,9 +42,7 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> getAllActiveProducts() {
         log.debug("Fetching all active products");
-        return productRepository.findByIsActiveTrue().stream()
-                .map(ProductResponse::fromEntity)
-                .collect(Collectors.toList());
+        return toResponses(productRepository.findByIsActiveTrue());
     }
 
     /**
@@ -48,7 +52,7 @@ public class ProductService {
     public Optional<ProductResponse> getProductById(Long id) {
         log.debug("Fetching product with ID: {}", id);
         return productRepository.findById(id)
-                .map(ProductResponse::fromEntity);
+                .map(product -> ProductResponse.fromEntity(product, mediaResponsesFor(product.getId())));
     }
 
     /**
@@ -57,9 +61,7 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> getProductsByCategory(Long categoryId) {
         log.debug("Fetching products for category ID: {}", categoryId);
-        return productRepository.findByCategoryIdAndActive(categoryId).stream()
-                .map(ProductResponse::fromEntity)
-                .collect(Collectors.toList());
+        return toResponses(productRepository.findByCategoryIdAndActive(categoryId));
     }
 
     /**
@@ -68,8 +70,33 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> getAllProducts() {
         log.debug("Fetching all products");
-        return productRepository.findAll().stream()
-                .map(ProductResponse::fromEntity)
+        return toResponses(productRepository.findAll());
+    }
+
+    /**
+     * Map a list of products to responses, batch-fetching their media assets in one
+     * query instead of one query per product.
+     */
+    private List<ProductResponse> toResponses(List<Product> products) {
+        if (products.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> productIds = products.stream().map(Product::getId).collect(Collectors.toList());
+        Map<Long, List<MediaAssetResponse>> mediaByProduct = mediaAssetRepository
+                .findByProductIdInAndIsActiveTrue(productIds).stream()
+                .map(MediaAssetResponse::fromEntity)
+                .collect(Collectors.groupingBy(MediaAssetResponse::getProductId));
+
+        return products.stream()
+                .map(product -> ProductResponse.fromEntity(product,
+                        mediaByProduct.getOrDefault(product.getId(), Collections.emptyList())))
+                .collect(Collectors.toList());
+    }
+
+    private List<MediaAssetResponse> mediaResponsesFor(Long productId) {
+        return mediaAssetRepository.findByProductIdAndIsActiveTrue(productId).stream()
+                .map(MediaAssetResponse::fromEntity)
                 .collect(Collectors.toList());
     }
 
@@ -128,9 +155,10 @@ public class ProductService {
         }
 
         Product savedProduct = productRepository.save(product);
+        attachMediaAssets(savedProduct, productRequest.getMediaAssetIds());
         log.info("Product created successfully: {}", savedProduct.getName());
 
-        return ProductResponse.fromEntity(savedProduct);
+        return ProductResponse.fromEntity(savedProduct, mediaResponsesFor(savedProduct.getId()));
     }
 
     /**
@@ -199,9 +227,24 @@ public class ProductService {
         }
 
         Product updatedProduct = productRepository.save(product);
+        attachMediaAssets(updatedProduct, productRequest.getMediaAssetIds());
         log.info("Product updated successfully: {}", updatedProduct.getName());
-        
-        return Optional.of(ProductResponse.fromEntity(updatedProduct));
+
+        return Optional.of(ProductResponse.fromEntity(updatedProduct, mediaResponsesFor(updatedProduct.getId())));
+    }
+
+    /**
+     * Attach already-uploaded media assets to a product by ID, reassigning any that belonged
+     * to a different product. Silently ignores IDs that don't exist.
+     */
+    private void attachMediaAssets(Product product, List<Long> mediaAssetIds) {
+        if (mediaAssetIds == null || mediaAssetIds.isEmpty()) {
+            return;
+        }
+
+        List<MediaAsset> assets = mediaAssetRepository.findAllById(mediaAssetIds);
+        assets.forEach(asset -> asset.setProduct(product));
+        mediaAssetRepository.saveAll(assets);
     }
 
     /**
