@@ -1,0 +1,24 @@
+# Production profile.
+# Copy this file to application-prod.yml (already gitignored) or, preferably,
+# just set the referenced environment variables directly — every value here
+# comes from the environment with no fallback, so a missing var fails fast at
+# boot instead of silently connecting to the wrong place.
+
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+# Swagger/OpenAPI are attack surface with no upside in production.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
