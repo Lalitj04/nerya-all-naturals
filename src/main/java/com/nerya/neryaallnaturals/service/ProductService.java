@@ -1,6 +1,7 @@
 package com.nerya.neryaallnaturals.service;
 
 import com.nerya.neryaallnaturals.dto.MediaAssetResponse;
+import com.nerya.neryaallnaturals.dto.PagedResponse;
 import com.nerya.neryaallnaturals.dto.ProductRequest;
 import com.nerya.neryaallnaturals.dto.ProductResponse;
 import com.nerya.neryaallnaturals.entity.Category;
@@ -10,15 +11,19 @@ import com.nerya.neryaallnaturals.entity.ProductImage;
 import com.nerya.neryaallnaturals.exception.ConflictException;
 import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.repository.CategoryRepository;
-import com.nerya.neryaallnaturals.repository.InventoryRepository;
 import com.nerya.neryaallnaturals.repository.MediaAssetRepository;
 import com.nerya.neryaallnaturals.repository.ProductImageRepository;
 import com.nerya.neryaallnaturals.repository.ProductRepository;
+import com.nerya.neryaallnaturals.repository.spec.ProductSpecifications;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,16 +38,22 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductImageRepository productImageRepository;
-    private final InventoryRepository inventoryRepository;
     private final MediaAssetRepository mediaAssetRepository;
+    private final InventoryService inventoryService;
 
     /**
-     * Get all active products
+     * Public product search with optional keyword/category/price/stock filters and
+     * pagination (T35). Only active products are ever returned.
      */
     @Transactional(readOnly = true)
-    public List<ProductResponse> getAllActiveProducts() {
-        log.debug("Fetching all active products");
-        return toResponses(productRepository.findByIsActiveTrue());
+    public PagedResponse<ProductResponse> searchActiveProducts(String q, Long categoryId,
+                                                               BigDecimal minPrice, BigDecimal maxPrice,
+                                                               Boolean inStock, Pageable pageable) {
+        log.debug("Searching products: q={}, categoryId={}, minPrice={}, maxPrice={}, inStock={}, pageable={}",
+                q, categoryId, minPrice, maxPrice, inStock, pageable);
+        Specification<Product> spec = ProductSpecifications.activeMatching(q, categoryId, minPrice, maxPrice, inStock);
+        Page<Product> page = productRepository.findAll(spec, pageable);
+        return PagedResponse.of(toResponses(page.getContent()), page);
     }
 
     /**
@@ -118,7 +129,9 @@ public class ProductService {
             throw new ResourceNotFoundException("Category not found with ID: " + productRequest.getCategoryId());
         }
 
-        // Create product
+        // Create product. Stock (inStock/quantity) is intentionally NOT set from the
+        // request here — Inventory is the single source of truth (T36); inStock is derived
+        // from the inventory row created below.
         Product product = Product.builder()
                 .name(productRequest.getName())
                 .sku(productRequest.getSku())
@@ -129,8 +142,6 @@ public class ProductService {
                 .discountPercentage(productRequest.getDiscountPercentage())
                 .brand(productRequest.getBrand())
                 .weight(productRequest.getWeight())
-                .inStock(productRequest.getInStock())
-                .quantity(productRequest.getQuantity())
                 .minQuantity(productRequest.getMinQuantity())
                 .isActive(productRequest.getIsActive())
                 .isFeatured(productRequest.getIsFeatured())
@@ -156,8 +167,12 @@ public class ProductService {
 
         Product savedProduct = productRepository.save(product);
         attachMediaAssets(savedProduct, productRequest.getMediaAssetIds());
-        log.info("Product created successfully: {}", savedProduct.getName());
 
+        // Every product gets exactly one inventory row, seeded from the request's quantity
+        // (or 0). This also syncs the product's inStock flag (T36/T37).
+        inventoryService.createForProduct(savedProduct, productRequest.getQuantity());
+
+        log.info("Product created successfully: {}", savedProduct.getName());
         return ProductResponse.fromEntity(savedProduct, mediaResponsesFor(savedProduct.getId()));
     }
 
@@ -198,8 +213,7 @@ public class ProductService {
         product.setDiscountPercentage(productRequest.getDiscountPercentage());
         product.setBrand(productRequest.getBrand());
         product.setWeight(productRequest.getWeight());
-        product.setInStock(productRequest.getInStock());
-        product.setQuantity(productRequest.getQuantity());
+        // inStock/quantity are owned by Inventory (T36) — not overwritten from the request.
         product.setMinQuantity(productRequest.getMinQuantity());
         product.setIsActive(productRequest.getIsActive());
         product.setIsFeatured(productRequest.getIsFeatured());

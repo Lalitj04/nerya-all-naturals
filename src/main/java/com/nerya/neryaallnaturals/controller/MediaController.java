@@ -58,7 +58,9 @@ public class MediaController {
             @Parameter(description = "Display order within the category (default 0)")
             @RequestParam(value = "sortOrder", required = false) Integer sortOrder,
             @Parameter(description = "Product to attach this image to (optional)")
-            @RequestParam(value = "productId", required = false) Long productId) throws IOException {
+            @RequestParam(value = "productId", required = false) Long productId,
+            @Parameter(description = "Category to link this image to, for category tiles (optional)")
+            @RequestParam(value = "categoryId", required = false) Long categoryId) throws IOException {
 
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is required");
@@ -69,7 +71,7 @@ public class MediaController {
         }
 
         log.info("Admin: uploading media file '{}' to category {}", file.getOriginalFilename(), category);
-        MediaAssetResponse response = mediaService.upload(file, category, altText, sortOrder, productId);
+        MediaAssetResponse response = mediaService.upload(file, category, altText, sortOrder, productId, categoryId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -148,6 +150,17 @@ public class MediaController {
     @GetMapping("/product/{productId}")
     public ResponseEntity<List<MediaAssetResponse>> getByProduct(@PathVariable Long productId) {
         return ResponseEntity.ok(mediaService.getByProduct(productId));
+    }
+
+    /**
+     * Fetch the images linked to a Category entity (category tiles), ordered by sort order.
+     * Open API - No authentication required
+     */
+    @Operation(summary = "List a category's tile images",
+            description = "Active images linked to a Category entity by id. No authentication required.")
+    @GetMapping("/category-entity/{categoryId}")
+    public ResponseEntity<List<MediaAssetResponse>> getByCategoryEntity(@PathVariable Long categoryId) {
+        return ResponseEntity.ok(mediaService.getByCategoryEntity(categoryId));
     }
 
     /**

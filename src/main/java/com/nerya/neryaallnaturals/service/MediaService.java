@@ -5,11 +5,13 @@ import com.nerya.neryaallnaturals.config.GoogleDriveProperties;
 import com.nerya.neryaallnaturals.dto.MediaAssetResponse;
 import com.nerya.neryaallnaturals.dto.MediaRegisterRequest;
 import com.nerya.neryaallnaturals.dto.MediaUpdateRequest;
+import com.nerya.neryaallnaturals.entity.Category;
 import com.nerya.neryaallnaturals.entity.MediaAsset;
 import com.nerya.neryaallnaturals.entity.MediaAsset.MediaCategory;
 import com.nerya.neryaallnaturals.entity.Product;
 import com.nerya.neryaallnaturals.exception.ConflictException;
 import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
+import com.nerya.neryaallnaturals.repository.CategoryRepository;
 import com.nerya.neryaallnaturals.repository.MediaAssetRepository;
 import com.nerya.neryaallnaturals.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,14 +31,16 @@ public class MediaService {
 
     private final MediaAssetRepository mediaAssetRepository;
     private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
     private final GoogleDriveService googleDriveService;
     private final GoogleDriveProperties googleDriveProperties;
 
     @Transactional
     public MediaAssetResponse upload(MultipartFile file, MediaCategory category, String altText,
-                                      Integer sortOrder, Long productId) throws IOException {
+                                      Integer sortOrder, Long productId, Long categoryId) throws IOException {
         String folderId = resolveFolderId(category);
         Product product = resolveProduct(productId);
+        Category linkedCategory = resolveCategory(categoryId);
 
         File driveFile = googleDriveService.upload(file, folderId);
         googleDriveService.makePublicReader(driveFile.getId());
@@ -52,6 +56,7 @@ public class MediaService {
                 .altText(altText)
                 .sortOrder(sortOrder != null ? sortOrder : 0)
                 .product(product)
+                .linkedCategory(linkedCategory)
                 .isActive(true)
                 .build();
 
@@ -67,6 +72,7 @@ public class MediaService {
         }
 
         Product product = resolveProduct(request.getProductId());
+        Category linkedCategory = resolveCategory(request.getCategoryId());
 
         File driveFile = googleDriveService.getMetadata(request.getDriveFileId());
         googleDriveService.makePublicReader(request.getDriveFileId());
@@ -82,6 +88,7 @@ public class MediaService {
                 .altText(request.getAltText())
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0)
                 .product(product)
+                .linkedCategory(linkedCategory)
                 .isActive(true)
                 .build();
 
@@ -154,6 +161,11 @@ public class MediaService {
     }
 
     @Transactional(readOnly = true)
+    public List<MediaAssetResponse> getByCategoryEntity(Long categoryId) {
+        return toResponses(mediaAssetRepository.findByLinkedCategoryIdAndIsActiveTrueOrderBySortOrderAsc(categoryId));
+    }
+
+    @Transactional(readOnly = true)
     public MediaAssetResponse getById(Long id) {
         return mediaAssetRepository.findById(id)
                 .map(MediaAssetResponse::fromEntity)
@@ -178,5 +190,13 @@ public class MediaService {
         }
         return productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+    }
+
+    private Category resolveCategory(Long categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + categoryId));
     }
 }

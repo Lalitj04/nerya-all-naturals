@@ -63,6 +63,15 @@ public class MediaAsset extends BaseEntity {
     @JoinColumn(name = "product_id")
     private Product product;
 
+    /**
+     * Optional link to a Category, used for category tile/thumbnail images. Named
+     * {@code linkedCategory} because {@link #category} is already taken by the
+     * {@link MediaCategory} enum.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category linkedCategory;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;

@@ -22,6 +22,11 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
 
 jwt:
   secret: ${JWT_SECRET}

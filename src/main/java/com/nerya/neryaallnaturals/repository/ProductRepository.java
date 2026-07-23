@@ -3,6 +3,7 @@ package com.nerya.neryaallnaturals.repository;
 import com.nerya.neryaallnaturals.entity.Category;
 import com.nerya.neryaallnaturals.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -11,10 +12,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ProductRepository extends JpaRepository<Product, Long> {
-    
+public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
+
     Optional<Product> findBySku(String sku);
-    
+
+    /** True if any product (active or not) references this category. */
+    boolean existsByCategoryId(Long categoryId);
+
     List<Product> findByIsActiveTrue();
     
     List<Product> findByCategoryAndIsActiveTrue(Category category);

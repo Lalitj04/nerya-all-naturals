@@ -25,4 +25,7 @@ public class MediaRegisterRequest {
     private Integer sortOrder;
 
     private Long productId;
+
+    /** Optional Category to link this asset to, for category tile/thumbnail images. */
+    private Long categoryId;
 }

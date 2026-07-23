@@ -6,22 +6,28 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Base for HTTP-level integration tests. Boots the full application on a random port
  * against a real MySQL 8 container, so Flyway migrations run and Hibernate validates the
- * schema exactly as in production. The container is static, so it starts once and is
- * shared across every test class that extends this one.
+ * schema exactly as in production.
+ *
+ * <p>Uses the Testcontainers "singleton container" pattern: the container is started once
+ * in a static initializer and shared across every test class that extends this one, with
+ * Ryuk stopping it at JVM exit. We deliberately do NOT use {@code @Testcontainers}/
+ * {@code @Container} here — those tie the container's lifecycle to a single test class and
+ * would stop it after the first integration class finishes, leaving the Spring-cached
+ * context of the next class pointing at a dead database.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
 public abstract class AbstractIntegrationTest {
 
-    @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
             .withDatabaseName("nerya_test");
+
+    static {
+        MYSQL.start();
+    }
 
     @Autowired
     protected TestRestTemplate rest;

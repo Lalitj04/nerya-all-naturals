@@ -22,4 +22,9 @@ public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
             MediaAsset.MediaCategory category, Long productId);
 
     List<MediaAsset> findByProductIdInAndIsActiveTrue(List<Long> productIds);
+
+    // Category-tile images: linked to a Category entity via category_id.
+    List<MediaAsset> findByLinkedCategoryIdAndIsActiveTrueOrderBySortOrderAsc(Long categoryId);
+
+    List<MediaAsset> findByLinkedCategoryIdInAndIsActiveTrue(List<Long> categoryIds);
 }

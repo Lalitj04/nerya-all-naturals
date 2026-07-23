@@ -1,6 +1,7 @@
 package com.nerya.neryaallnaturals.controller;
 
 import com.nerya.neryaallnaturals.annotation.AdminOnly;
+import com.nerya.neryaallnaturals.dto.PagedResponse;
 import com.nerya.neryaallnaturals.dto.ProductRequest;
 import com.nerya.neryaallnaturals.dto.ProductResponse;
 import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
@@ -8,10 +9,12 @@ import com.nerya.neryaallnaturals.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -23,16 +26,28 @@ public class ProductController {
     private final ProductService productService;
 
     /**
-     * Fetch all active products
+     * Search active products with optional filters and pagination.
      * Open API - No authentication required
-     * 
-     * @return list of all active products
+     *
+     * @param q          keyword matched against name/short/long description (optional)
+     * @param categoryId restrict to a category (optional)
+     * @param minPrice   minimum selling price (optional)
+     * @param maxPrice   maximum selling price (optional)
+     * @param inStock    restrict to in-stock (true) or out-of-stock (false) products (optional)
+     * @param pageable   page/size/sort (default size 20, max 100 via application.yml)
+     * @return a page of matching products
      */
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
-        log.info("Fetching all active products");
-        List<ProductResponse> products = productService.getAllActiveProducts();
-        return ResponseEntity.ok(products);
+    public ResponseEntity<PagedResponse<ProductResponse>> getProducts(
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "categoryId", required = false) Long categoryId,
+            @RequestParam(value = "minPrice", required = false) BigDecimal minPrice,
+            @RequestParam(value = "maxPrice", required = false) BigDecimal maxPrice,
+            @RequestParam(value = "inStock", required = false) Boolean inStock,
+            Pageable pageable) {
+        log.info("Searching products (q={}, categoryId={})", q, categoryId);
+        return ResponseEntity.ok(
+                productService.searchActiveProducts(q, categoryId, minPrice, maxPrice, inStock, pageable));
     }
 
     /**

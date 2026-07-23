@@ -18,6 +18,8 @@ public class MediaAssetResponse {
     private String altText;
     private Integer sortOrder;
     private Long productId;
+    /** Linked Category entity id (for category tile images), or null. */
+    private Long categoryId;
 
     public static MediaAssetResponse fromEntity(MediaAsset asset) {
         return MediaAssetResponse.builder()
@@ -27,6 +29,7 @@ public class MediaAssetResponse {
                 .altText(asset.getAltText())
                 .sortOrder(asset.getSortOrder())
                 .productId(asset.getProduct() != null ? asset.getProduct().getId() : null)
+                .categoryId(asset.getLinkedCategory() != null ? asset.getLinkedCategory().getId() : null)
                 .build();
     }
 }

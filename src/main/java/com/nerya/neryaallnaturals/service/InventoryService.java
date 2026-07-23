@@ -26,6 +26,45 @@ public class InventoryService {
     private final ProductRepository productRepository;
 
     /**
+     * Create the single inventory row for a freshly created product (T37), seeded with the
+     * given on-hand quantity (defaults to 0). Also syncs the product's derived inStock flag.
+     *
+     * @param product        the newly persisted product
+     * @param quantityOnHand initial stock, or null for 0
+     * @return the persisted inventory row
+     */
+    @Transactional
+    public Inventory createForProduct(Product product, Integer quantityOnHand) {
+        Inventory inventory = Inventory.builder()
+                .product(product)
+                .quantityOnHand(quantityOnHand != null ? quantityOnHand : 0)
+                .quantityReserved(0)
+                .quantitySold(0)
+                .minStockLevel(5)
+                .maxStockLevel(1000)
+                .reorderQuantity(50)
+                .build();
+        Inventory saved = inventoryRepository.save(inventory);
+        syncProductAvailability(saved);
+        return saved;
+    }
+
+    /**
+     * Recompute and persist the linked product's {@code inStock} flag from the inventory's
+     * available quantity. Inventory is the single source of truth for stock (T36, fix V13),
+     * so this runs on every inventory change.
+     */
+    @Transactional
+    public void syncProductAvailability(Inventory inventory) {
+        Product product = inventory.getProduct();
+        boolean available = inventory.getAvailableQuantity() > 0;
+        if (!Boolean.valueOf(available).equals(product.getInStock())) {
+            product.setInStock(available);
+            productRepository.save(product);
+        }
+    }
+
+    /**
      * Get all inventory records
      */
     @Transactional(readOnly = true)
@@ -88,6 +127,7 @@ public class InventoryService {
                 .build();
 
         Inventory savedInventory = inventoryRepository.save(inventory);
+        syncProductAvailability(savedInventory);
         log.info("Inventory created successfully for product ID: {}", inventoryRequest.getProductId());
 
         return InventoryResponse.fromEntity(savedInventory);
@@ -146,6 +186,7 @@ public class InventoryService {
         }
 
         Inventory updatedInventory = inventoryRepository.save(inventory);
+        syncProductAvailability(updatedInventory);
         log.info("Inventory updated successfully with ID: {}", id);
 
         return Optional.of(InventoryResponse.fromEntity(updatedInventory));

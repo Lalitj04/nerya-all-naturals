@@ -77,5 +77,35 @@ public class CategoryController {
         CategoryResponse createdCategory = categoryService.createCategory(categoryRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory);
     }
+
+    /**
+     * Admin only - Update a category (rename, description, image, active flag, parent).
+     * Admin API - Requires authentication
+     *
+     * @param id category ID
+     * @param categoryRequest updated details
+     * @return updated category
+     */
+    @PutMapping("/admin/{id}")
+    @AdminOnly
+    public ResponseEntity<CategoryResponse> updateCategory(@PathVariable Long id,
+                                                            @Valid @RequestBody CategoryRequest categoryRequest) {
+        log.info("Admin: Updating category with ID: {}", id);
+        return ResponseEntity.ok(categoryService.updateCategory(id, categoryRequest));
+    }
+
+    /**
+     * Admin only - Soft-delete a category. Refuses when products or subcategories reference it.
+     * Admin API - Requires authentication
+     *
+     * @param id category ID
+     */
+    @DeleteMapping("/admin/{id}")
+    @AdminOnly
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+        log.info("Admin: Deleting category with ID: {}", id);
+        categoryService.deleteCategory(id);
+        return ResponseEntity.noContent().build();
+    }
 }
 
