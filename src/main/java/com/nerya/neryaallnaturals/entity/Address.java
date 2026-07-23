@@ -15,9 +15,10 @@ import lombok.*;
 @Builder
 public class Address extends BaseEntity {
 
-    @NotNull(message = "Customer ID is required")
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
+    @NotNull(message = "Customer is required")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id", nullable = false)
+    private Customer customer;
 
     @NotBlank(message = "Name is required")
     @Size(max = 100)
@@ -47,4 +48,8 @@ public class Address extends BaseEntity {
     @Size(max = 20)
     @Column(name = "pin_code", nullable = false)
     private String pinCode;
+
+    @Column(name = "is_default")
+    @Builder.Default
+    private Boolean isDefault = false;
 }

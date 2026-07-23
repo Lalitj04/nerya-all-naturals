@@ -59,6 +59,9 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:mysql'
+    // Real HTTP client for TestRestTemplate — reads 4xx error responses cleanly instead
+    // of the JDK client's "cannot retry ... in streaming mode" failure on POSTs.
+    testImplementation 'org.apache.httpcomponents.client5:httpclient5'
 }
 
 dependencyManagement {

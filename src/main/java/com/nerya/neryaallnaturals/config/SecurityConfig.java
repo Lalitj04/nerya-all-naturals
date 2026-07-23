@@ -36,6 +36,8 @@ public class SecurityConfig {
                 // silently expose any future endpoint added under that prefix.
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/validate").permitAll()
                 .requestMatchers("/api/health", "/api/ping").permitAll() // Deployment check endpoints
                 // Public catalog reads — /admin/** sub-paths on these controllers stay

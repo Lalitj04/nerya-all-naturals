@@ -60,6 +60,17 @@ public class AuthService {
     }
 
     /**
+     * Generate a JWT access token for a user outside the login flow (e.g. right after
+     * registration, or when issuing a new access token from a refresh token).
+     *
+     * @param user the user to issue a token for
+     * @return JWT token string
+     */
+    public String generateToken(User user) {
+        return jwtUtil.generateToken(user);
+    }
+
+    /**
      * Validate JWT token
      *
      * @param token JWT token to validate

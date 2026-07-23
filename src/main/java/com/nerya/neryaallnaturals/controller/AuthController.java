@@ -2,8 +2,14 @@ package com.nerya.neryaallnaturals.controller;
 
 import com.nerya.neryaallnaturals.dto.AuthResponse;
 import com.nerya.neryaallnaturals.dto.LoginRequest;
+import com.nerya.neryaallnaturals.dto.RefreshTokenRequest;
+import com.nerya.neryaallnaturals.dto.RegisterRequest;
+import com.nerya.neryaallnaturals.entity.Customer;
+import com.nerya.neryaallnaturals.entity.RefreshToken;
 import com.nerya.neryaallnaturals.entity.User;
 import com.nerya.neryaallnaturals.service.AuthService;
+import com.nerya.neryaallnaturals.service.CustomerService;
+import com.nerya.neryaallnaturals.service.RefreshTokenService;
 import com.nerya.neryaallnaturals.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +28,8 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final CustomerService customerService;
+    private final RefreshTokenService refreshTokenService;
 
     /**
      * Login endpoint - authenticates user and returns JWT token
@@ -50,11 +58,15 @@ public class AuthController {
         Optional<User> userOptional = userService.getUserForAuthentication(loginRequest.getUsernameOrEmail());
         if (userOptional.isPresent()) {
             User user = userOptional.get();
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
             AuthResponse response = AuthResponse.builder()
                     .token(token)
                     .type("Bearer")
+                    .refreshToken(refreshToken.getToken())
                     .username(user.getUsername())
                     .email(user.getEmail())
+                    .roles(user.getRoles())
+                    .customerId(customerService.findCustomerIdByUsername(user.getUsername()).orElse(null))
                     .build();
 
             log.info("Login successful for: {}", user.getUsername());
@@ -63,6 +75,71 @@ public class AuthController {
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Error generating authentication response");
+    }
+
+    /**
+     * Registration endpoint - creates a User (ROLE_CUSTOMER) and its linked Customer
+     * profile in one transaction, then logs the new customer straight in.
+     *
+     * @param registerRequest the new customer's details
+     * @return JWT token with user details, same shape as login
+     */
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        log.info("Registration attempt for: {}", registerRequest.getUsername());
+
+        Customer customer = customerService.registerCustomer(registerRequest);
+        User user = customer.getUser();
+        String token = authService.generateToken(user);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        AuthResponse response = AuthResponse.builder()
+                .token(token)
+                .type("Bearer")
+                .refreshToken(refreshToken.getToken())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .roles(user.getRoles())
+                .customerId(customer.getId())
+                .build();
+
+        log.info("Registration successful for: {}", user.getUsername());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Exchange a still-valid refresh token for a new access token. The refresh token
+     * itself is not rotated — the same one keeps working until it expires or is revoked.
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        RefreshToken refreshToken = refreshTokenService.requireValid(request.getRefreshToken());
+        User user = refreshToken.getUser();
+        String newAccessToken = authService.generateToken(user);
+
+        AuthResponse response = AuthResponse.builder()
+                .token(newAccessToken)
+                .type("Bearer")
+                .refreshToken(refreshToken.getToken())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .roles(user.getRoles())
+                .customerId(customerService.findCustomerIdByUsername(user.getUsername()).orElse(null))
+                .build();
+
+        log.info("Access token refreshed for: {}", user.getUsername());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Revoke a refresh token, ending that session. The still-live access token remains
+     * valid until it naturally expires (stateless JWTs aren't revocable), but no new
+     * access token can be minted from this refresh token afterward.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        refreshTokenService.revoke(request.getRefreshToken());
+        return ResponseEntity.noContent().build();
     }
 
     /**
