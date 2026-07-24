@@ -5,6 +5,7 @@ import com.nerya.neryaallnaturals.dto.InventoryResponse;
 import com.nerya.neryaallnaturals.entity.Inventory;
 import com.nerya.neryaallnaturals.entity.Product;
 import com.nerya.neryaallnaturals.exception.ConflictException;
+import com.nerya.neryaallnaturals.exception.InsufficientStockException;
 import com.nerya.neryaallnaturals.exception.ResourceNotFoundException;
 import com.nerya.neryaallnaturals.repository.InventoryRepository;
 import com.nerya.neryaallnaturals.repository.ProductRepository;
@@ -47,6 +48,67 @@ public class InventoryService {
         Inventory saved = inventoryRepository.save(inventory);
         syncProductAvailability(saved);
         return saved;
+    }
+
+    // ---- Order-driven stock lifecycle (T49). All three lock the row FOR UPDATE and run inside
+    // the caller's transaction, so reservations/sales never race or drift. ----
+
+    /**
+     * Reserve {@code quantity} units for a checkout: verifies available stock under a write lock
+     * and moves it into {@code quantityReserved}. Throws {@link InsufficientStockException} if
+     * the available quantity is short.
+     */
+    @Transactional
+    public void reserve(Long productId, int quantity) {
+        Inventory inventory = lockForProduct(productId);
+        if (inventory.getAvailableQuantity() < quantity) {
+            throw new InsufficientStockException(
+                    "Only " + inventory.getAvailableQuantity() + " unit(s) of '"
+                            + inventory.getProduct().getName() + "' are available");
+        }
+        inventory.setQuantityReserved(inventory.getQuantityReserved() + quantity);
+        persistAndSync(inventory);
+        log.info("Reserved {} unit(s) of product {} (reserved now {})",
+                quantity, productId, inventory.getQuantityReserved());
+    }
+
+    /**
+     * Release a previously-held reservation back to available stock — used when an order is
+     * cancelled. Clamped at zero so a double-release can never drive the count negative.
+     */
+    @Transactional
+    public void release(Long productId, int quantity) {
+        Inventory inventory = lockForProduct(productId);
+        int released = Math.max(0, inventory.getQuantityReserved() - quantity);
+        inventory.setQuantityReserved(released);
+        persistAndSync(inventory);
+        log.info("Released {} unit(s) of product {} (reserved now {})", quantity, productId, released);
+    }
+
+    /**
+     * Convert a reservation into a completed sale when an order ships: the units leave both
+     * {@code quantityReserved} and {@code quantityOnHand} and land in {@code quantitySold}.
+     */
+    @Transactional
+    public void ship(Long productId, int quantity) {
+        Inventory inventory = lockForProduct(productId);
+        inventory.setQuantityReserved(Math.max(0, inventory.getQuantityReserved() - quantity));
+        inventory.setQuantityOnHand(Math.max(0, inventory.getQuantityOnHand() - quantity));
+        inventory.setQuantitySold(inventory.getQuantitySold() + quantity);
+        persistAndSync(inventory);
+        log.info("Shipped {} unit(s) of product {} (on hand {}, sold {})",
+                quantity, productId, inventory.getQuantityOnHand(), inventory.getQuantitySold());
+    }
+
+    private Inventory lockForProduct(Long productId) {
+        return inventoryRepository.findByProductIdForUpdate(productId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No inventory for product ID: " + productId));
+    }
+
+    private void persistAndSync(Inventory inventory) {
+        Inventory saved = inventoryRepository.save(inventory);
+        syncProductAvailability(saved);
     }
 
     /**
