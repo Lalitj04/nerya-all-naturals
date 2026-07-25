@@ -147,6 +147,41 @@ public class OrderService {
         return OrderResponse.fromEntity(cancel(order));
     }
 
+    // ---- payments (T54) ----
+
+    /** Look up an order the given customer owns, for payment creation. */
+    @Transactional(readOnly = true)
+    public Order getOwnedOrderEntity(String username, String orderNumber) {
+        return findOwnedOrder(username, orderNumber);
+    }
+
+    @Transactional(readOnly = true)
+    public Order getOrderEntity(String orderNumber) {
+        return findOrder(orderNumber);
+    }
+
+    /** Flip an order to paid/confirmed once its payment succeeds (COD or gateway webhook). */
+    @Transactional
+    public void markOrderPaid(Order order) {
+        order.setPaymentStatus(PaymentStatus.PAID);
+        if (order.getStatus().canTransitionTo(OrderStatus.CONFIRMED)) {
+            order.setStatus(OrderStatus.CONFIRMED);
+        }
+        orderRepository.save(order);
+        log.info("Order {} marked PAID/CONFIRMED", order.getOrderNumber());
+    }
+
+    /** Record COD as the chosen payment method without marking the order paid yet. */
+    @Transactional
+    public void markOrderCod(Order order) {
+        order.setPaymentStatus(PaymentStatus.COD);
+        if (order.getStatus().canTransitionTo(OrderStatus.CONFIRMED)) {
+            order.setStatus(OrderStatus.CONFIRMED);
+        }
+        orderRepository.save(order);
+        log.info("Order {} marked COD/CONFIRMED", order.getOrderNumber());
+    }
+
     // ---- admin (T48) ----
 
     @Transactional(readOnly = true)

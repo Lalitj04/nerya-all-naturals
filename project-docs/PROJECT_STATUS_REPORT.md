@@ -192,6 +192,23 @@ Ordered roughly as they should be built. The detailed task breakdown (with table
 
 The backend is a functional MVP storefront when: security P0 fixes are merged · a guest can browse products with images · a customer can register, fill a cart, and check out · an admin can manage orders and inventory without stock drift · Flyway owns the schema · at least one payment path (COD or gateway sandbox) completes.
 
+**This MVP definition of done is now met** (see §4 below).
+
+---
+
+## 4. Update — 2026-07-24: Phases P5–P8 complete
+
+All phases through P8 in `IMPLEMENTATION_TASK_PLAN.md` are implemented on branch `phase6`:
+
+- **P5 — Orders & checkout** (T45–T51): `orders`/`order_items` (`V8__orders.sql`), transactional checkout with row-locked inventory reservation, idempotent replay via `Idempotency-Key`, customer + admin order APIs, status state machine, stock lifecycle on ship/cancel.
+- **P6 — Payments** (T52–T55): `payments` (`V9__payments.sql`), COD (`PaymentProvider.COD`, marks order `COD`/`CONFIRMED` immediately) and Razorpay sandbox (`PaymentProvider.RAZORPAY` — order creation via REST, `POST /api/payments/webhook` with HMAC-SHA256 signature verification and duplicate-delivery idempotency).
+- **P7 — Reviews** (T56–T57): `ProductReview.customerId` replaced with a proper `Customer` FK + one-review-per-customer-per-product unique constraint (`V10__product_reviews_fk.sql`); public paged reads, customer-scoped create/update/delete, admin moderation delete; `verifiedPurchase` auto-computed from delivered-order history (never client-supplied); `Product.averageRating`/`totalReviews` recomputed on every write.
+- **P8 — Hardening** (T58–T60): login brute-force throttling (`LoginRateLimitFilter`, Bucket4j, 5 failed attempts/min per IP and per attempted username, configurable via `rate-limit.login.*` / `LOGIN_RATE_LIMIT_CAPACITY` / `LOGIN_RATE_LIMIT_WINDOW_SECONDS`); regression suite covering checkout races, cart, identity/IDOR/role-escalation, payments (COD, webhook signature + idempotency), reviews, and a forged-JWT/rate-limit security suite — 49 tests, `./gradlew test` green against a real MySQL Testcontainer.
+
+New environment variables: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `LOGIN_RATE_LIMIT_CAPACITY` (default 5), `LOGIN_RATE_LIMIT_WINDOW_SECONDS` (default 60). Razorpay keys are optional — leaving them unset disables the gateway path while COD continues to work; the online-payment endpoint then returns 409 instead of 500.
+
+Not yet done: real Razorpay sandbox credentials haven't been exercised end-to-end (only signature verification and the not-configured path are covered by tests); transactional email is still unimplemented (§3.5).
+
 ---
 
 *End of report.*

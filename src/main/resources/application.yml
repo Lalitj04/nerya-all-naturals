@@ -40,6 +40,17 @@ admin:
   password: ${ADMIN_PASSWORD:}
   email: ${ADMIN_EMAIL:}
 
+rate-limit:
+  login:
+    capacity: ${LOGIN_RATE_LIMIT_CAPACITY:5}
+    window-seconds: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:60}
+
+payment:
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+
 media:
   google:
     credentials-path: ${GOOGLE_DRIVE_CREDENTIALS:}

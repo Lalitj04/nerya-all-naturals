@@ -19,14 +19,9 @@ public class ProductReview extends BaseEntity {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @NotNull(message = "Customer ID is required")
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
-
-    @NotBlank(message = "Customer name is required")
-    @Size(max = 100)
-    @Column(name = "customer_name", nullable = false)
-    private String customerName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id", nullable = false)
+    private Customer customer;
 
     @NotNull(message = "Rating is required")
     @Min(1)

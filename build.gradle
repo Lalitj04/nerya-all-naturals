@@ -51,6 +51,9 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-mysql'
 
+    // Login rate limiting (T58)
+    implementation 'com.bucket4j:bucket4j-core:8.10.1'
+
     // Google Drive (media storage backend)
     implementation 'com.google.api-client:google-api-client:2.6.0'
     implementation 'com.google.apis:google-api-services-drive:v3-rev20240628-2.0.0'

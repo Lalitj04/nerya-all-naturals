@@ -391,13 +391,48 @@ README with every env var (`JWT_SECRET`, `DB_*`, `GOOGLE_DRIVE_CREDENTIALS`, `DR
 
 ---
 
+## Phase P9 — Blog / CMS (admin-authored blog posts)
+
+Admin writes and publishes blog posts with images; the storefront lists/reads only published ones. Images ride the existing Google Drive media pipeline from Phase P1 rather than a new upload path.
+
+### T61 — Schema: Flyway `V11__blogs.sql`
+- `blogs`: id, title, slug (unique, URL-safe), excerpt (short teaser, nullable), content (`TEXT`/`LONGTEXT`, HTML or Markdown produced by the admin's editor — sanitize on render in the frontend, not here), status (`DRAFT|PUBLISHED`), author_admin_id (FK → `users`), published_at (nullable — set on first publish), created_at/updated_at.
+- Alter `media_assets`: extend the `category` enum with `BLOG`, add nullable `blog_id BIGINT` + `fk_media_assets_blog FOREIGN KEY … REFERENCES blogs(id)`, following the exact pattern `linkedCategory`/`category_id` already uses for category tile images (`entity/MediaAsset.java`, `V2__media_assets.sql`).
+- Index `idx_blogs_status_published_at (status, published_at)` for the public listing query, and `uk_blogs_slug UNIQUE (slug)`.
+
+### T62 — Entity + repository
+`Blog extends BaseEntity` (Lombok `@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder`, matching every other entity) with a `@OneToMany(mappedBy = "blog")` back-reference from `MediaAsset` (mirrors `Product.images`). Add `MediaAsset.MediaCategory.BLOG` and a `linkedBlog` FK field next to the existing `linkedCategory` one. `BlogRepository` — `findBySlug`, `findByStatus(Pageable)` for the public list, `existsBySlug` for uniqueness checks on create/rename.
+
+### T63 — Slug generation
+Slugify the title (lowercase, hyphenated, strip non-alphanumerics) on create; if it collides, append `-2`, `-3`, etc. Slug is immutable after publish (breaks shared links otherwise) — allow it to be edited only while `DRAFT`.
+
+### T64 — Admin blog APIs
+- `POST /api/blogs/admin` (`@AdminOnly`) — create as `DRAFT`.
+- `PUT /api/blogs/admin/{id}` (`@AdminOnly`) — edit title/excerpt/content; slug editable only in `DRAFT` (T63).
+- `POST /api/blogs/admin/{id}/publish` / `POST /api/blogs/admin/{id}/unpublish` (`@AdminOnly`) — flips `status` and stamps `published_at` on first publish only (never overwritten by re-publish).
+- `DELETE /api/blogs/admin/{id}` (`@AdminOnly`).
+- `GET /api/blogs/admin` / `GET /api/blogs/admin/{id}` (`@AdminOnly`) — sees drafts too, unlike the public reads.
+
+### T65 — Blog image APIs
+Reuse `MediaService`/`GoogleDriveService` from Phase P1 exactly as products do: `POST /api/media/admin/upload` with `category=BLOG` and a `blogId` to link a cover image or an inline gallery image to a post, `sortOrder` controlling cover-vs-gallery position (`sortOrder = 0` convention = cover, matching how `ProductImage`/media ordering already works). No new upload endpoint needed — only the `BLOG` enum value and `blogId` linkage from T61/T62.
+
+### T66 — Public blog APIs
+`GET /api/blogs` (paged, `status = PUBLISHED` only, newest-`published_at`-first) · `GET /api/blogs/{slug}` (404 if `DRAFT` or missing — never leak unpublished content by slug guessing). Both `permitAll`, added to `SecurityConfig` alongside the other public catalog reads. Response includes the resolved cover image URL + gallery image list via the linked `MediaAsset`s.
+
+### T67 — Blog tests
+Admin create → edit → publish → appears in public list/by-slug; unpublish removes it from public reads but keeps it visible to admin; slug uniqueness/collision suffixing; draft is 404 publicly even with the correct slug; non-admin write attempts rejected (403).
+
+**Acceptance:** an admin can write a post with a cover image and inline images, save it as a draft, come back and publish it, and it then appears on the public site with working image URLs; unpublishing hides it again without deleting it.
+
+---
+
 ## Final target API surface (condensed)
 
 | Audience | Endpoints |
 |----------|-----------|
-| **Public** | `POST /api/auth/login`, `POST /api/auth/register` · `GET /api/products…` (search/filter/paged) · `GET /api/categories…` · `GET /api/media…` (by category/product) · `GET /api/products/{id}/reviews` · health |
+| **Public** | `POST /api/auth/login`, `POST /api/auth/register` · `GET /api/products…` (search/filter/paged) · `GET /api/categories…` · `GET /api/media…` (by category/product) · `GET /api/products/{id}/reviews` · `GET /api/blogs`, `GET /api/blogs/{slug}` · health |
 | **Customer** | `/api/customers/me` + addresses · `/api/cart…` · `POST /api/orders/checkout`, `/api/orders/me…` · `/api/payments/create` · review write |
-| **Admin** | product/category/inventory/user admin (hardened) · `/api/media/admin/upload|register|{id}` · `/api/orders/admin…` · review moderation |
+| **Admin** | product/category/inventory/user admin (hardened) · `/api/media/admin/upload|register|{id}` · `/api/orders/admin…` · review moderation · `/api/blogs/admin…` (CRUD + publish/unpublish) |
 
 ## Environment variables (final set)
 
@@ -407,9 +442,10 @@ JWT_SECRET, JWT_EXPIRATION
 CORS_ALLOWED_ORIGINS
 GOOGLE_DRIVE_CREDENTIALS                                    # path to service-account JSON
 DRIVE_FOLDER_HERO, DRIVE_FOLDER_BANNER, DRIVE_FOLDER_PRODUCT,
-DRIVE_FOLDER_CATEGORY, DRIVE_FOLDER_GALLERY
+DRIVE_FOLDER_CATEGORY, DRIVE_FOLDER_GALLERY, DRIVE_FOLDER_BLOG   # BLOG added in phase P9
 ADMIN_USERNAME, ADMIN_PASSWORD                              # bootstrap only
 RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET   # phase P6
+LOGIN_RATE_LIMIT_CAPACITY, LOGIN_RATE_LIMIT_WINDOW_SECONDS      # phase P8
 SPRING_PROFILES_ACTIVE
 ```
 
@@ -422,6 +458,7 @@ SPRING_PROFILES_ACTIVE
 - [ ] Orders reserve stock atomically; admin manages statuses; no stock drift
 - [ ] COD or sandbox payment marks orders paid
 - [ ] Flyway owns the schema; tests cover security + checkout; README documents env
+- [ ] (P9, post-MVP) Admin can write, image, and publish blog posts; guests see only published ones
 
 **Recommended start:** T1 (rotate password) today, then T2–T14 as the first coding sprint, then jump straight to P1 (media) so the UI team can start building the storefront visuals while commerce flows are developed.
 

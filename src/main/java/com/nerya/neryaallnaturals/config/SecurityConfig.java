@@ -1,6 +1,7 @@
 package com.nerya.neryaallnaturals.config;
 
 import com.nerya.neryaallnaturals.filter.JwtAuthenticationFilter;
+import com.nerya.neryaallnaturals.filter.LoginRateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final LoginRateLimitFilter loginRateLimitFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -46,12 +48,16 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/category/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}", "/api/categories/parents").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/media", "/api/media/{id}", "/api/media/category/**", "/api/media/category-entity/**", "/api/media/product/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products/{id}/reviews").permitAll()
+                // Signature-verified in PaymentService rather than by Spring Security.
+                .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
 
                 // All other requests require authentication
                 // Authorization is handled by method-level annotations (@AdminOnly, @CustomerOnly, etc.)
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(loginRateLimitFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 

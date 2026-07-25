@@ -39,4 +39,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                              @Param("from") LocalDateTime from,
                              @Param("to") LocalDateTime to,
                              Pageable pageable);
+
+    /** Verified-purchase rule (T57): has this customer ever received a delivered order line for the product? */
+    @Query("""
+            SELECT COUNT(o) > 0 FROM Order o JOIN o.items i
+            WHERE o.customer.id = :customerId AND i.product.id = :productId AND o.status = 'DELIVERED'
+            """)
+    boolean existsDeliveredOrderWithProduct(@Param("customerId") Long customerId, @Param("productId") Long productId);
 }
