@@ -20,6 +20,8 @@ public class MediaAssetResponse {
     private Long productId;
     /** Linked Category entity id (for category tile images), or null. */
     private Long categoryId;
+    /** Linked Blog entity id (for post cover/inline images), or null. */
+    private Long blogId;
 
     public static MediaAssetResponse fromEntity(MediaAsset asset) {
         return MediaAssetResponse.builder()
@@ -30,6 +32,7 @@ public class MediaAssetResponse {
                 .sortOrder(asset.getSortOrder())
                 .productId(asset.getProduct() != null ? asset.getProduct().getId() : null)
                 .categoryId(asset.getLinkedCategory() != null ? asset.getLinkedCategory().getId() : null)
+                .blogId(asset.getLinkedBlog() != null ? asset.getLinkedBlog().getId() : null)
                 .build();
     }
 }

@@ -60,6 +60,7 @@ media:
       PRODUCT: ${DRIVE_FOLDER_PRODUCT:}
       CATEGORY: ${DRIVE_FOLDER_CATEGORY:}
       GALLERY: ${DRIVE_FOLDER_GALLERY:}
+      BLOG: ${DRIVE_FOLDER_BLOG:}
 
 management:
   endpoints:

@@ -60,7 +60,9 @@ public class MediaController {
             @Parameter(description = "Product to attach this image to (optional)")
             @RequestParam(value = "productId", required = false) Long productId,
             @Parameter(description = "Category to link this image to, for category tiles (optional)")
-            @RequestParam(value = "categoryId", required = false) Long categoryId) throws IOException {
+            @RequestParam(value = "categoryId", required = false) Long categoryId,
+            @Parameter(description = "Blog post to attach this image to, for cover/inline post images (optional)")
+            @RequestParam(value = "blogId", required = false) Long blogId) throws IOException {
 
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is required");
@@ -71,7 +73,7 @@ public class MediaController {
         }
 
         log.info("Admin: uploading media file '{}' to category {}", file.getOriginalFilename(), category);
-        MediaAssetResponse response = mediaService.upload(file, category, altText, sortOrder, productId, categoryId);
+        MediaAssetResponse response = mediaService.upload(file, category, altText, sortOrder, productId, categoryId, blogId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -161,6 +163,18 @@ public class MediaController {
     @GetMapping("/category-entity/{categoryId}")
     public ResponseEntity<List<MediaAssetResponse>> getByCategoryEntity(@PathVariable Long categoryId) {
         return ResponseEntity.ok(mediaService.getByCategoryEntity(categoryId));
+    }
+
+    /**
+     * Fetch the images linked to a Blog post (cover + inline gallery), ordered by sort order.
+     * Open API - No authentication required
+     */
+    @Operation(summary = "List a blog post's images",
+            description = "Active images linked to a Blog entity by id, ordered by sort order (sortOrder 0 is " +
+                    "the cover image by convention). No authentication required.")
+    @GetMapping("/blog/{blogId}")
+    public ResponseEntity<List<MediaAssetResponse>> getByBlog(@PathVariable Long blogId) {
+        return ResponseEntity.ok(mediaService.getByBlog(blogId));
     }
 
     /**

@@ -211,4 +211,10 @@ Not yet done: real Razorpay sandbox credentials haven't been exercised end-to-en
 
 ---
 
+## 5. Update — 2026-07-25: Phase P9 (Blog/CMS) complete
+
+`blogs` (`V11__blogs.sql`) + `media_assets` extended with a `BLOG` category and `blog_id` FK, mirroring how category tile images already attach. Admin can create a draft, edit it, attach a cover/inline images via the existing `POST /api/media/admin/upload` (`category=BLOG`, `blogId=...`), and publish it; the public site only ever sees `GET /api/blogs` (paged, published-only) and `GET /api/blogs/{slug}` (404s for drafts and unknown slugs alike, so slugs can't be guessed to leak unpublished content). Slugs are generated from the title with `-2`/`-3`… collision suffixing and are only re-derived while a post is still a `DRAFT`; publishing requires non-empty content. New env var: `DRIVE_FOLDER_BLOG` (optional — Drive uploads for that category are disabled without it, same as the other media categories). `BlogIntegrationTest` covers the draft/publish/unpublish visibility lifecycle, slug collisions, empty-content publish rejection, and non-admin write rejection — 54 tests, `./gradlew test` green.
+
+---
+
 *End of report.*

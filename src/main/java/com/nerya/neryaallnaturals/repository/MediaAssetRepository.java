@@ -27,4 +27,9 @@ public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
     List<MediaAsset> findByLinkedCategoryIdAndIsActiveTrueOrderBySortOrderAsc(Long categoryId);
 
     List<MediaAsset> findByLinkedCategoryIdInAndIsActiveTrue(List<Long> categoryIds);
+
+    // Blog post images: linked to a Blog entity via blog_id.
+    List<MediaAsset> findByLinkedBlogIdAndIsActiveTrueOrderBySortOrderAsc(Long blogId);
+
+    List<MediaAsset> findByLinkedBlogIdInAndIsActiveTrue(List<Long> blogIds);
 }

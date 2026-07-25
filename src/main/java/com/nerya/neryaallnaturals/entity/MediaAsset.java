@@ -72,6 +72,11 @@ public class MediaAsset extends BaseEntity {
     @JoinColumn(name = "category_id")
     private Category linkedCategory;
 
+    /** Optional link to a Blog, for cover/inline post images (T61/T65). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "blog_id")
+    private Blog linkedBlog;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
@@ -81,6 +86,7 @@ public class MediaAsset extends BaseEntity {
         BANNER,
         PRODUCT,
         CATEGORY,
-        GALLERY
+        GALLERY,
+        BLOG
     }
 }

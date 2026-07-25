@@ -28,4 +28,7 @@ public class MediaRegisterRequest {
 
     /** Optional Category to link this asset to, for category tile/thumbnail images. */
     private Long categoryId;
+
+    /** Optional Blog to link this asset to, for post cover/inline images. */
+    private Long blogId;
 }

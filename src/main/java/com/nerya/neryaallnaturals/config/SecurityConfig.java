@@ -47,10 +47,15 @@ public class SecurityConfig {
                 // patterns (checked against the controllers' actual admin routes).
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/{id}", "/api/products/category/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/{id}", "/api/categories/parents").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/media", "/api/media/{id}", "/api/media/category/**", "/api/media/category-entity/**", "/api/media/product/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/media", "/api/media/{id}", "/api/media/category/**", "/api/media/category-entity/**", "/api/media/product/**", "/api/media/blog/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/{id}/reviews").permitAll()
                 // Signature-verified in PaymentService rather than by Spring Security.
                 .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
+                // Must precede the /api/blogs/{slug} wildcard below: that single-segment pattern
+                // would otherwise also match "/api/blogs/admin" and wrongly permit it (@AdminOnly
+                // still blocks non-admins either way, but this keeps the HTTP layer correct too).
+                .requestMatchers(HttpMethod.GET, "/api/blogs/admin", "/api/blogs/admin/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/blogs", "/api/blogs/{slug}").permitAll()
 
                 // All other requests require authentication
                 // Authorization is handled by method-level annotations (@AdminOnly, @CustomerOnly, etc.)

@@ -1,6 +1,6 @@
 # Nerya All Naturals — Backend
 
-Spring Boot 3 / Java 21 e-commerce API (catalog, cart, checkout, payments, reviews) backed by MySQL + Flyway.
+Spring Boot 3 / Java 21 e-commerce API (catalog, cart, checkout, payments, reviews, blog CMS) backed by MySQL + Flyway.
 
 ## Running locally
 
@@ -31,7 +31,7 @@ Requires a MySQL 8 instance and the environment variables below. `JWT_SECRET` an
 | `RAZORPAY_KEY_SECRET` | no | — | Razorpay secret key, used server-side to create orders |
 | `RAZORPAY_WEBHOOK_SECRET` | no | — | Secret configured on the Razorpay webhook, used to verify inbound signatures |
 | `GOOGLE_DRIVE_CREDENTIALS` | no | — | Path to a Google service-account JSON key; leaving unset disables Drive media uploads |
-| `DRIVE_FOLDER_HERO` / `_BANNER` / `_PRODUCT` / `_CATEGORY` / `_GALLERY` | no | — | Drive folder IDs per media category |
+| `DRIVE_FOLDER_HERO` / `_BANNER` / `_PRODUCT` / `_CATEGORY` / `_GALLERY` / `_BLOG` | no | — | Drive folder IDs per media category |
 
 ## Tests
 
@@ -52,4 +52,4 @@ The image exposes `GET /actuator/health` as its healthcheck.
 
 ## API surface
 
-See `API_ENDPOINTS.md` / `API_SUMMARY.md` for catalog/category details, and `project-docs/IMPLEMENTATION_TASK_PLAN.md` for the full phase-by-phase endpoint list (auth, customers, cart, orders, payments, reviews, admin).
+See `API_ENDPOINTS.md` / `API_SUMMARY.md` for catalog/category details, and `project-docs/IMPLEMENTATION_TASK_PLAN.md` for the full phase-by-phase endpoint list (auth, customers, cart, orders, payments, reviews, blog, admin).
