@@ -52,4 +52,4 @@ The image exposes `GET /actuator/health` as its healthcheck.
 
 ## API surface
 
-See `API_ENDPOINTS.md` / `API_SUMMARY.md` for catalog/category details, and `project-docs/IMPLEMENTATION_TASK_PLAN.md` for the full phase-by-phase endpoint list (auth, customers, cart, orders, payments, reviews, blog, admin).
+See **`API_REFERENCE.md`** for the full API reference (every endpoint, request/response JSON shapes, auth requirements) — the doc to hand to frontend engineers. `API_ENDPOINTS.md` / `API_SUMMARY.md` cover catalog/category endpoints in more narrative detail, and `project-docs/IMPLEMENTATION_TASK_PLAN.md` has the phase-by-phase build history.
