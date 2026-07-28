@@ -8,12 +8,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     Optional<Inventory> findByProductId(Long productId);
+
+    /** Batch-fetch inventory rows for several products at once (avoids N+1 on product listings). */
+    List<Inventory> findByProductIdIn(List<Long> productIds);
 
     /**
      * Fetch the inventory row for a product with a row-level write lock (SELECT ... FOR UPDATE),

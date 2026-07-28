@@ -16,6 +16,14 @@ public class MediaAssetResponse {
     private MediaAsset.MediaCategory category;
     private String publicUrl;
     private String altText;
+    /** On-screen headline (mainly for HERO/BANNER slides), or null. */
+    private String title;
+    /** Supporting sub-heading text, or null. */
+    private String subtitle;
+    /** Click-through/redirection target when the image is clicked, or null. */
+    private String linkUrl;
+    /** Optional CTA button label paired with {@link #linkUrl}, or null. */
+    private String linkText;
     private Integer sortOrder;
     private Long productId;
     /** Linked Category entity id (for category tile images), or null. */
@@ -29,6 +37,10 @@ public class MediaAssetResponse {
                 .category(asset.getCategory())
                 .publicUrl(asset.getPublicUrl())
                 .altText(asset.getAltText())
+                .title(asset.getTitle())
+                .subtitle(asset.getSubtitle())
+                .linkUrl(asset.getLinkUrl())
+                .linkText(asset.getLinkText())
                 .sortOrder(asset.getSortOrder())
                 .productId(asset.getProduct() != null ? asset.getProduct().getId() : null)
                 .categoryId(asset.getLinkedCategory() != null ? asset.getLinkedCategory().getId() : null)

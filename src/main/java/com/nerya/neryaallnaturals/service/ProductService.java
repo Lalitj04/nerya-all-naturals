@@ -63,7 +63,11 @@ public class ProductService {
     public Optional<ProductResponse> getProductById(Long id) {
         log.debug("Fetching product with ID: {}", id);
         return productRepository.findById(id)
-                .map(product -> ProductResponse.fromEntity(product, mediaResponsesFor(product.getId())));
+                .map(product -> {
+                    ProductResponse response = ProductResponse.fromEntity(product, mediaResponsesFor(product.getId()));
+                    response.setQuantity(inventoryService.getAvailableQuantity(product.getId()));
+                    return response;
+                });
     }
 
     /**
@@ -98,10 +102,15 @@ public class ProductService {
                 .findByProductIdInAndIsActiveTrue(productIds).stream()
                 .map(MediaAssetResponse::fromEntity)
                 .collect(Collectors.groupingBy(MediaAssetResponse::getProductId));
+        Map<Long, Integer> availableByProduct = inventoryService.getAvailableQuantitiesByProductId(productIds);
 
         return products.stream()
-                .map(product -> ProductResponse.fromEntity(product,
-                        mediaByProduct.getOrDefault(product.getId(), Collections.emptyList())))
+                .map(product -> {
+                    ProductResponse response = ProductResponse.fromEntity(product,
+                            mediaByProduct.getOrDefault(product.getId(), Collections.emptyList()));
+                    response.setQuantity(availableByProduct.getOrDefault(product.getId(), 0));
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -173,7 +182,9 @@ public class ProductService {
         inventoryService.createForProduct(savedProduct, productRequest.getQuantity());
 
         log.info("Product created successfully: {}", savedProduct.getName());
-        return ProductResponse.fromEntity(savedProduct, mediaResponsesFor(savedProduct.getId()));
+        ProductResponse response = ProductResponse.fromEntity(savedProduct, mediaResponsesFor(savedProduct.getId()));
+        response.setQuantity(inventoryService.getAvailableQuantity(savedProduct.getId()));
+        return response;
     }
 
     /**
@@ -244,7 +255,9 @@ public class ProductService {
         attachMediaAssets(updatedProduct, productRequest.getMediaAssetIds());
         log.info("Product updated successfully: {}", updatedProduct.getName());
 
-        return Optional.of(ProductResponse.fromEntity(updatedProduct, mediaResponsesFor(updatedProduct.getId())));
+        ProductResponse response = ProductResponse.fromEntity(updatedProduct, mediaResponsesFor(updatedProduct.getId()));
+        response.setQuantity(inventoryService.getAvailableQuantity(updatedProduct.getId()));
+        return Optional.of(response);
     }
 
     /**

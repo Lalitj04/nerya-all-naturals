@@ -28,7 +28,7 @@ import java.util.Set;
 @RequestMapping("/api/media")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Media", description = "Google Drive-backed image metadata: admin uploads/registers/manages assets; " +
+@Tag(name = "Media", description = "Cloudinary-backed image metadata: admin uploads/registers/manages assets; " +
         "the storefront fetches them by category or product with no auth required")
 public class MediaController {
 
@@ -38,11 +38,11 @@ public class MediaController {
     private final MediaService mediaService;
 
     /**
-     * Admin only - Upload an image to Google Drive and record its metadata.
+     * Admin only - Upload an image to Cloudinary and record its metadata.
      * Admin API - Requires authentication
      */
-    @Operation(summary = "Upload an image", description = "Uploads to the Drive folder configured for the given " +
-            "category, makes it publicly viewable, and records its metadata. Accepts image/jpeg, image/png, " +
+    @Operation(summary = "Upload an image", description = "Uploads to Cloudinary (into a folder derived from the " +
+            "category), and records its public URL + metadata. Accepts image/jpeg, image/png, " +
             "image/webp, image/gif up to 5 MB.")
     @PostMapping(value = "/admin/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @AdminOnly
@@ -55,6 +55,14 @@ public class MediaController {
             @RequestParam("category") MediaCategory category,
             @Parameter(description = "Alt text for accessibility/SEO")
             @RequestParam(value = "altText", required = false) String altText,
+            @Parameter(description = "On-screen headline (mainly for HERO/BANNER slides)")
+            @RequestParam(value = "title", required = false) String title,
+            @Parameter(description = "Supporting sub-heading text")
+            @RequestParam(value = "subtitle", required = false) String subtitle,
+            @Parameter(description = "Click-through/redirection target when the image is clicked")
+            @RequestParam(value = "linkUrl", required = false) String linkUrl,
+            @Parameter(description = "CTA button label paired with linkUrl")
+            @RequestParam(value = "linkText", required = false) String linkText,
             @Parameter(description = "Display order within the category (default 0)")
             @RequestParam(value = "sortOrder", required = false) Integer sortOrder,
             @Parameter(description = "Product to attach this image to (optional)")
@@ -73,20 +81,21 @@ public class MediaController {
         }
 
         log.info("Admin: uploading media file '{}' to category {}", file.getOriginalFilename(), category);
-        MediaAssetResponse response = mediaService.upload(file, category, altText, sortOrder, productId, categoryId, blogId);
+        MediaAssetResponse response = mediaService.upload(file, category, altText, title, subtitle,
+                linkUrl, linkText, sortOrder, productId, categoryId, blogId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
-     * Admin only - Register a file that was placed in Drive manually.
+     * Admin only - Register an image already hosted elsewhere (any CDN/Cloudinary URL).
      * Admin API - Requires authentication
      */
-    @Operation(summary = "Register an existing Drive file", description = "For images already placed in a Drive " +
-            "folder manually: fetches the file's metadata, makes it publicly viewable, and records it.")
+    @Operation(summary = "Register an existing hosted image", description = "Records an image already hosted " +
+            "elsewhere by its public URL, without re-uploading it.")
     @PostMapping("/admin/register")
     @AdminOnly
     public ResponseEntity<MediaAssetResponse> register(@Valid @RequestBody MediaRegisterRequest request) throws IOException {
-        log.info("Admin: registering existing Drive file {}", request.getDriveFileId());
+        log.info("Admin: registering existing image {}", request.getPublicUrl());
         MediaAssetResponse response = mediaService.registerExisting(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -105,15 +114,15 @@ public class MediaController {
     }
 
     /**
-     * Admin only - Soft delete (default) or hard delete (?hard=true, also removes the Drive file).
+     * Admin only - Soft delete (default) or hard delete (?hard=true, also removes the Cloudinary asset).
      * Admin API - Requires authentication
      */
     @Operation(summary = "Delete a media asset", description = "By default sets isActive=false (soft delete). " +
-            "With ?hard=true, also deletes the underlying Drive file and removes the row.")
+            "With ?hard=true, also deletes the underlying Cloudinary asset and removes the row.")
     @DeleteMapping("/admin/{id}")
     @AdminOnly
     public ResponseEntity<Void> delete(@PathVariable Long id,
-                                        @Parameter(description = "Also delete the Drive file")
+                                        @Parameter(description = "Also delete the Cloudinary asset")
                                         @RequestParam(value = "hard", defaultValue = "false") boolean hard) throws IOException {
         log.info("Admin: deleting media asset {} (hard={})", id, hard);
         mediaService.delete(id, hard);

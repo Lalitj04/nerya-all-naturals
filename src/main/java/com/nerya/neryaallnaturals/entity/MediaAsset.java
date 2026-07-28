@@ -15,10 +15,11 @@ import lombok.*;
 @Builder
 public class MediaAsset extends BaseEntity {
 
-    @NotBlank(message = "Drive file ID is required")
-    @Size(max = 128)
-    @Column(name = "drive_file_id", nullable = false, unique = true)
-    private String driveFileId;
+    /** Provider-side identifier (Cloudinary public id) — used to delete/manage the asset. */
+    @NotBlank(message = "Storage key is required")
+    @Size(max = 255)
+    @Column(name = "storage_key", nullable = false, unique = true)
+    private String storageKey;
 
     @NotBlank(message = "File name is required")
     @Size(max = 255)
@@ -54,6 +55,28 @@ public class MediaAsset extends BaseEntity {
     @Size(max = 255)
     @Column(name = "alt_text")
     private String altText;
+
+    // ---- optional display copy + CTA, mainly for HERO/BANNER slides (nullable for other categories) ----
+
+    /** On-screen headline shown over/next to the image (distinct from {@link #altText}). */
+    @Size(max = 255)
+    @Column(name = "title")
+    private String title;
+
+    /** Supporting/sub-heading text under the title. */
+    @Size(max = 500)
+    @Column(name = "subtitle")
+    private String subtitle;
+
+    /** Click-through/redirection target when the image is clicked (relative path or absolute URL). */
+    @Size(max = 1024)
+    @Column(name = "link_url")
+    private String linkUrl;
+
+    /** Optional call-to-action button label paired with {@link #linkUrl}. */
+    @Size(max = 100)
+    @Column(name = "link_text")
+    private String linkText;
 
     @Column(name = "sort_order")
     @Builder.Default

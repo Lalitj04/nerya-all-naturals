@@ -32,6 +32,11 @@ public class ProductResponse {
     private String brand;
     private String weight;
     private Boolean inStock;
+    /**
+     * Available stock (on-hand minus reserved). Populated by ProductService from the Inventory
+     * row — Inventory is the single source of truth for stock (T36), not the underlying
+     * {@code Product.quantity} column (which is left unset).
+     */
     private Integer quantity;
     private Integer minQuantity;
     private Boolean isActive;

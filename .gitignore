@@ -72,3 +72,6 @@ application-dev.yml
 application-prod.yml
 .env
 .env.template
+
+# Google service-account key (never commit)
+secrets/

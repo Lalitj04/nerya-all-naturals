@@ -1,7 +1,6 @@
 package com.nerya.neryaallnaturals.service;
 
-import com.google.api.services.drive.model.File;
-import com.nerya.neryaallnaturals.config.GoogleDriveProperties;
+import com.nerya.neryaallnaturals.config.CloudinaryProperties;
 import com.nerya.neryaallnaturals.dto.MediaAssetResponse;
 import com.nerya.neryaallnaturals.dto.MediaRegisterRequest;
 import com.nerya.neryaallnaturals.dto.MediaUpdateRequest;
@@ -20,10 +19,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,30 +36,33 @@ public class MediaService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BlogRepository blogRepository;
-    private final GoogleDriveService googleDriveService;
-    private final GoogleDriveProperties googleDriveProperties;
+    private final CloudinaryService cloudinaryService;
+    private final CloudinaryProperties cloudinaryProperties;
 
     @Transactional
     public MediaAssetResponse upload(MultipartFile file, MediaCategory category, String altText,
+                                      String title, String subtitle, String linkUrl, String linkText,
                                       Integer sortOrder, Long productId, Long categoryId,
                                       Long blogId) throws IOException {
-        String folderId = resolveFolderId(category);
         Product product = resolveProduct(productId);
         Category linkedCategory = resolveCategory(categoryId);
         Blog linkedBlog = resolveBlog(blogId);
 
-        File driveFile = googleDriveService.upload(file, folderId);
-        googleDriveService.makePublicReader(driveFile.getId());
+        String folder = folderFor(category);
+        CloudinaryService.UploadResult uploaded = cloudinaryService.upload(file, folder);
 
         MediaAsset asset = MediaAsset.builder()
-                .driveFileId(driveFile.getId())
-                .fileName(driveFile.getName())
-                .mimeType(driveFile.getMimeType())
+                .storageKey(uploaded.publicId())
+                .fileName(file.getOriginalFilename())
+                .mimeType(file.getContentType())
                 .category(category)
-                .publicUrl(GoogleDriveService.publicUrlFor(driveFile.getId()))
-                .webViewLink(driveFile.getWebViewLink())
-                .thumbnailLink(driveFile.getThumbnailLink())
+                .publicUrl(uploaded.url())
+                .folderPath(folder)
                 .altText(altText)
+                .title(title)
+                .subtitle(subtitle)
+                .linkUrl(linkUrl)
+                .linkText(linkText)
                 .sortOrder(sortOrder != null ? sortOrder : 0)
                 .product(product)
                 .linkedCategory(linkedCategory)
@@ -71,28 +75,34 @@ public class MediaService {
         return MediaAssetResponse.fromEntity(saved);
     }
 
+    /**
+     * Record an image that is already hosted elsewhere (any CDN/Cloudinary URL) as a media asset,
+     * without re-uploading it. Useful for images uploaded outside the app.
+     */
     @Transactional
-    public MediaAssetResponse registerExisting(MediaRegisterRequest request) throws IOException {
-        if (mediaAssetRepository.findByDriveFileId(request.getDriveFileId()).isPresent()) {
-            throw new ConflictException("A media asset already exists for this Drive file");
+    public MediaAssetResponse registerExisting(MediaRegisterRequest request) {
+        String storageKey = StringUtils.hasText(request.getStorageKey())
+                ? request.getStorageKey()
+                : "external-" + UUID.randomUUID();
+
+        if (mediaAssetRepository.findByStorageKey(storageKey).isPresent()) {
+            throw new ConflictException("A media asset already exists for this storage key");
         }
 
         Product product = resolveProduct(request.getProductId());
         Category linkedCategory = resolveCategory(request.getCategoryId());
         Blog linkedBlog = resolveBlog(request.getBlogId());
 
-        File driveFile = googleDriveService.getMetadata(request.getDriveFileId());
-        googleDriveService.makePublicReader(request.getDriveFileId());
-
         MediaAsset asset = MediaAsset.builder()
-                .driveFileId(request.getDriveFileId())
-                .fileName(driveFile.getName())
-                .mimeType(driveFile.getMimeType())
+                .storageKey(storageKey)
+                .fileName(request.getPublicUrl())
                 .category(request.getCategory())
-                .publicUrl(GoogleDriveService.publicUrlFor(request.getDriveFileId()))
-                .webViewLink(driveFile.getWebViewLink())
-                .thumbnailLink(driveFile.getThumbnailLink())
+                .publicUrl(request.getPublicUrl())
                 .altText(request.getAltText())
+                .title(request.getTitle())
+                .subtitle(request.getSubtitle())
+                .linkUrl(request.getLinkUrl())
+                .linkText(request.getLinkText())
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0)
                 .product(product)
                 .linkedCategory(linkedCategory)
@@ -101,7 +111,7 @@ public class MediaService {
                 .build();
 
         MediaAsset saved = mediaAssetRepository.save(asset);
-        log.info("Registered existing Drive file {} as media asset {}", request.getDriveFileId(), saved.getId());
+        log.info("Registered existing image {} as media asset {}", request.getPublicUrl(), saved.getId());
         return MediaAssetResponse.fromEntity(saved);
     }
 
@@ -112,6 +122,18 @@ public class MediaService {
 
         if (request.getAltText() != null) {
             asset.setAltText(request.getAltText());
+        }
+        if (request.getTitle() != null) {
+            asset.setTitle(request.getTitle());
+        }
+        if (request.getSubtitle() != null) {
+            asset.setSubtitle(request.getSubtitle());
+        }
+        if (request.getLinkUrl() != null) {
+            asset.setLinkUrl(request.getLinkUrl());
+        }
+        if (request.getLinkText() != null) {
+            asset.setLinkText(request.getLinkText());
         }
         if (request.getSortOrder() != null) {
             asset.setSortOrder(request.getSortOrder());
@@ -133,9 +155,9 @@ public class MediaService {
                 .orElseThrow(() -> new ResourceNotFoundException("Media asset not found"));
 
         if (hard) {
-            googleDriveService.delete(asset.getDriveFileId());
+            cloudinaryService.delete(asset.getStorageKey());
             mediaAssetRepository.delete(asset);
-            log.info("Hard-deleted media asset {} (Drive file {})", id, asset.getDriveFileId());
+            log.info("Hard-deleted media asset {} (storage key {})", id, asset.getStorageKey());
         } else {
             asset.setIsActive(false);
             mediaAssetRepository.save(asset);
@@ -189,12 +211,9 @@ public class MediaService {
         return assets.stream().map(MediaAssetResponse::fromEntity).collect(Collectors.toList());
     }
 
-    private String resolveFolderId(MediaCategory category) {
-        String folderId = googleDriveProperties.getFolders().get(category);
-        if (folderId == null || folderId.isBlank()) {
-            throw new IllegalStateException("No Drive folder configured for category " + category);
-        }
-        return folderId;
+    /** Cloudinary folder an asset of this category is stored under, e.g. {@code nerya/hero}. */
+    private String folderFor(MediaCategory category) {
+        return cloudinaryProperties.getFolder() + "/" + category.name().toLowerCase();
     }
 
     private Product resolveProduct(Long productId) {

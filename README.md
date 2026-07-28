@@ -30,8 +30,8 @@ Requires a MySQL 8 instance and the environment variables below. `JWT_SECRET` an
 | `RAZORPAY_KEY_ID` | no | — | Razorpay public key; leaving unset disables online payment (COD still works) |
 | `RAZORPAY_KEY_SECRET` | no | — | Razorpay secret key, used server-side to create orders |
 | `RAZORPAY_WEBHOOK_SECRET` | no | — | Secret configured on the Razorpay webhook, used to verify inbound signatures |
-| `GOOGLE_DRIVE_CREDENTIALS` | no | — | Path to a Google service-account JSON key; leaving unset disables Drive media uploads |
-| `DRIVE_FOLDER_HERO` / `_BANNER` / `_PRODUCT` / `_CATEGORY` / `_GALLERY` / `_BLOG` | no | — | Drive folder IDs per media category |
+| `CLOUDINARY_URL` | no | — | Cloudinary connection string (`cloudinary://<api_key>:<api_secret>@<cloud_name>`); leaving unset disables image uploads |
+| `CLOUDINARY_FOLDER` | no | `nerya` | Base folder uploads nest under (category appended, e.g. `nerya/hero`) |
 
 ## Tests
 

@@ -187,7 +187,7 @@ Same request body as create. **Response `200`.** `404` if the address isn't your
   "name": "Skincare",
   "description": "Natural skincare products",
   "imageUrl": null,
-  "thumbnailUrl": "https://drive.google.com/uc?id=...",  // Drive-backed tile image, if any
+  "thumbnailUrl": "https://res.cloudinary.com/.../tile.jpg",  // category tile image, if any
   "isActive": true,
   "parentId": null,
   "parentName": null,
@@ -295,7 +295,7 @@ Same body as create. **Response `200`.** `409` on name collision or self-parenti
   "metaTitle": "...",
   "metaDescription": "...",
   "mediaAssetIds": [55, 56],        // optional: attach already-uploaded media assets (preferred)
-  "imageUrls": [],                  // legacy: raw image URLs, pre-Google-Drive-media pipeline
+  "imageUrls": [],                  // legacy: raw image URLs, pre-media-pipeline
   "isPrimaryImage": false           // legacy, paired with imageUrls
 }
 ```
@@ -313,7 +313,9 @@ Same body as create. **Response `200`.**
 
 ## 5. Media (images) — `/api/media`
 
-Images are stored in Google Drive; this API manages the metadata pointer. Categories: `HERO`, `BANNER`, `PRODUCT`, `CATEGORY`, `GALLERY`, `BLOG`.
+Images are stored in Cloudinary; this API manages the metadata (public URL + attributes). Categories: `HERO`, `BANNER`, `PRODUCT`, `CATEGORY`, `GALLERY`, `BLOG`. Uploads go into a Cloudinary folder derived from the category (e.g. `nerya/hero`).
+
+Each asset can also carry **display copy + a click-through link** — mainly for `HERO`/`BANNER` slides that need an on-screen headline and a CTA. These fields (`title`, `subtitle`, `linkUrl`, `linkText`) are all optional and apply to any category.
 
 ### `POST /api/media/admin/upload` 🔒 Admin — upload an image
 **Request:** `multipart/form-data`:
@@ -321,7 +323,11 @@ Images are stored in Google Drive; this API manages the metadata pointer. Catego
 |---|---|---|
 | `file` | yes | image/jpeg, image/png, image/webp, image/gif, ≤5 MB |
 | `category` | yes | `HERO`\|`BANNER`\|`PRODUCT`\|`CATEGORY`\|`GALLERY`\|`BLOG` |
-| `altText` | no | accessibility/SEO text |
+| `altText` | no | accessibility/SEO alt text |
+| `title` | no | on-screen headline (e.g. hero/banner slide heading) |
+| `subtitle` | no | supporting sub-heading text |
+| `linkUrl` | no | click-through/redirection target (relative path or absolute URL) |
+| `linkText` | no | CTA button label paired with `linkUrl` |
 | `sortOrder` | no | display order (default 0; convention: 0 = cover/primary image) |
 | `productId` | no | attach to a product |
 | `categoryId` | no | attach to a category (tile image) |
@@ -329,30 +335,43 @@ Images are stored in Google Drive; this API manages the metadata pointer. Catego
 
 **Response `201`:**
 ```json
-{ "id": 55, "category": "PRODUCT", "publicUrl": "https://...", "altText": "...", "sortOrder": 0, "productId": 12, "categoryId": null, "blogId": null }
+{
+  "id": 55, "category": "HERO", "publicUrl": "https://...", "altText": "Summer sale hero",
+  "title": "Summer Sale", "subtitle": "Up to 40% off all naturals",
+  "linkUrl": "/products?sale=summer", "linkText": "Shop now",
+  "sortOrder": 0, "productId": null, "categoryId": null, "blogId": null
+}
 ```
+(`title`/`subtitle`/`linkUrl`/`linkText` are `null` when not set — e.g. for plain product images.)
 
-### `POST /api/media/admin/register` 🔒 Admin — register a manually-placed Drive file
+### `POST /api/media/admin/register` 🔒 Admin — register an already-hosted image (by URL)
+Records an image that already lives on a CDN/Cloudinary (or anywhere public) without re-uploading it.
 **Request:**
 ```json
 {
-  "driveFileId": "1a2b3c...",   // required
-  "category": "PRODUCT",         // required
+  "publicUrl": "https://res.cloudinary.com/.../hero.jpg", // required — the image URL
+  "storageKey": "nerya/hero/abc123", // optional Cloudinary public id; auto-generated if omitted
+  "category": "HERO",            // required
   "altText": "...",
+  "title": "Summer Sale",        // optional display copy
+  "subtitle": "Up to 40% off",   // optional
+  "linkUrl": "/products?sale=summer", // optional click-through
+  "linkText": "Shop now",        // optional CTA label
   "sortOrder": 0,
-  "productId": 12,
+  "productId": null,
   "categoryId": null,
   "blogId": null
 }
 ```
-**Response `201`:** `MediaAssetResponse` (as above). `409` if that Drive file is already registered.
+**Response `201`:** `MediaAssetResponse` (as above). `409` if that `storageKey` is already registered. (Assets registered without a real Cloudinary `storageKey` can't be hard-deleted from the provider.)
 
 ### `PUT /api/media/admin/{id}` 🔒 Admin — update metadata
-**Request** (all optional, null = unchanged): `{ "altText": "...", "sortOrder": 1, "category": "GALLERY", "isActive": true }`
+**Request** (all optional, null = unchanged; send `""` to clear a text field):
+`{ "altText": "...", "title": "...", "subtitle": "...", "linkUrl": "...", "linkText": "...", "sortOrder": 1, "category": "GALLERY", "isActive": true }`
 **Response `200`.**
 
 ### `DELETE /api/media/admin/{id}?hard=false` 🔒 Admin
-Default soft-delete (`isActive=false`). `?hard=true` also deletes the Drive file. **Response:** `204`.
+Default soft-delete (`isActive=false`). `?hard=true` also deletes the Cloudinary asset. **Response:** `204`.
 
 ### Public reads (no auth)
 | Endpoint | Returns |
@@ -363,6 +382,8 @@ Default soft-delete (`isActive=false`). `?hard=true` also deletes the Drive file
 | `GET /api/media/category-entity/{categoryId}` | a category's tile images |
 | `GET /api/media/blog/{blogId}` | a blog post's cover + inline images |
 | `GET /api/media/{id}` | single asset |
+
+**Hero/banner rendering:** call `GET /api/media/category/HERO` (or `BANNER`), then for each item render `publicUrl` as the image, `title`/`subtitle` as the overlaid copy, and wrap the slide in a link to `linkUrl` (labelled `linkText` if you show a button). Items come back ordered by `sortOrder`.
 
 ---
 
@@ -537,7 +558,7 @@ Admin-authored posts with a draft → publish lifecycle. Images reuse the Media 
   "authorName": "Admin User",
   "publishedAt": "2026-07-20T09:00:00",
   "createdAt": "2026-07-18T09:00:00",
-  "coverImageUrl": "https://drive.google.com/uc?id=...",
+  "coverImageUrl": "https://res.cloudinary.com/.../cover.jpg",
   "images": [
     { "id": 60, "category": "BLOG", "publicUrl": "https://...", "altText": "...", "sortOrder": 0, "productId": null, "categoryId": null, "blogId": 5 }
   ]

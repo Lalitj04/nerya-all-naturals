@@ -22,8 +22,8 @@ CREATE TABLE users (
 
 CREATE TABLE user_roles (
     user_id BIGINT NOT NULL,
-    role    ENUM('ROLE_ADMIN','ROLE_CUSTOMER','ROLE_USER') DEFAULT NULL,
-    KEY idx_user_roles_user (user_id),
+    role    ENUM('ROLE_ADMIN','ROLE_CUSTOMER','ROLE_USER') NOT NULL,
+    PRIMARY KEY (user_id, role),
     CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -130,8 +130,8 @@ CREATE TABLE product_reviews (
 
 CREATE TABLE product_tags (
     product_id  BIGINT NOT NULL,
-    tag         VARCHAR(255) DEFAULT NULL,
-    KEY idx_product_tags_product (product_id),
+    tag         VARCHAR(255) NOT NULL,
+    PRIMARY KEY (product_id, tag),
     CONSTRAINT fk_product_tags_product FOREIGN KEY (product_id) REFERENCES products (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

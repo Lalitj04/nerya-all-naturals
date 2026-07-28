@@ -2,7 +2,7 @@ spring:
   application:
     name: nerya-all-naturals
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:testdb}?createDatabaseIfNotExist=true
+    url: jdbc:mysql://${DB_HOST:}:${DB_PORT:}/${DB_NAME:}?sslMode=REQUIRED
     username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -29,13 +29,15 @@ spring:
         max-page-size: 100
 
 jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:3600000} # 1 hour; refresh_tokens (30 days) renew it
+  secret: ${JWT_SECRET:}
+  expiration: ${JWT_EXPIRATION:3600000}
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:}
 
 admin:
+  # LOCAL-DEV DEFAULT admin, seeded on first startup when no admin exists yet.
+  # Override ADMIN_* (and change this password) in any real environment.
   username: ${ADMIN_USERNAME:}
   password: ${ADMIN_PASSWORD:}
   email: ${ADMIN_EMAIL:}
@@ -51,16 +53,13 @@ payment:
     key-secret: ${RAZORPAY_KEY_SECRET:}
     webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
 
-media:
-  google:
-    credentials-path: ${GOOGLE_DRIVE_CREDENTIALS:}
-    folders:
-      HERO: ${DRIVE_FOLDER_HERO:}
-      BANNER: ${DRIVE_FOLDER_BANNER:}
-      PRODUCT: ${DRIVE_FOLDER_PRODUCT:}
-      CATEGORY: ${DRIVE_FOLDER_CATEGORY:}
-      GALLERY: ${DRIVE_FOLDER_GALLERY:}
-      BLOG: ${DRIVE_FOLDER_BLOG:}
+cloudinary:
+  # Connection string from the Cloudinary dashboard:
+  #   cloudinary://<api_key>:<api_secret>@<cloud_name>
+  # Leave empty to disable uploads (the app still boots; upload endpoints then return an error).
+  url: ${CLOUDINARY_URL:}
+  # Base folder all uploads nest under; the media category is appended (e.g. nerya/hero).
+  folder: ${CLOUDINARY_FOLDER:}
 
 management:
   endpoints:

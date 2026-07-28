@@ -14,7 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -155,6 +157,34 @@ public class InventoryService {
         log.debug("Fetching inventory for product ID: {}", productId);
         return inventoryRepository.findByProductId(productId)
                 .map(InventoryResponse::fromEntity);
+    }
+
+    /**
+     * Available stock (on-hand minus reserved) for a single product, or 0 if it has no
+     * inventory row. Used to surface a truthful quantity on the catalog product responses,
+     * since {@code Product.quantity} is not the source of truth for stock (T36).
+     */
+    @Transactional(readOnly = true)
+    public int getAvailableQuantity(Long productId) {
+        return inventoryRepository.findByProductId(productId)
+                .map(Inventory::getAvailableQuantity)
+                .orElse(0);
+    }
+
+    /**
+     * Batch version of {@link #getAvailableQuantity(Long)}: available stock keyed by product id
+     * for a set of products, so a product listing doesn't fire one inventory query per row.
+     * Products without an inventory row are simply absent from the map (treat as 0).
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Integer> getAvailableQuantitiesByProductId(List<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return inventoryRepository.findByProductIdIn(productIds).stream()
+                .collect(Collectors.toMap(
+                        inventory -> inventory.getProduct().getId(),
+                        Inventory::getAvailableQuantity));
     }
 
     /**

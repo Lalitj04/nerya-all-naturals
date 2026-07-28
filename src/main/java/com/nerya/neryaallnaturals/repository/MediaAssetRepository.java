@@ -14,7 +14,7 @@ public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
 
     List<MediaAsset> findByProductIdAndIsActiveTrue(Long productId);
 
-    Optional<MediaAsset> findByDriveFileId(String driveFileId);
+    Optional<MediaAsset> findByStorageKey(String storageKey);
 
     List<MediaAsset> findByIsActiveTrueOrderBySortOrderAsc();
 
